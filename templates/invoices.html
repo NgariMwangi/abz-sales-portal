@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Invoices - ABZ Sales Portal{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Invoices</h1>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" onclick="exportInvoices()">
+                <i class="fas fa-download"></i> Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label for="status" class="form-label">Invoice Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="">All Statuses</option>
+                        <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="paid" {% if current_status == 'paid' %}selected{% endif %}>Paid</option>
+                        <option value="overdue" {% if current_status == 'overdue' %}selected{% endif %}>Overdue</option>
+                        <option value="cancelled" {% if current_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="date_from" class="form-label">Date From</label>
+                    <input type="date" class="form-control" id="date_from" name="date_from">
+                </div>
+                <div class="col-md-3">
+                    <label for="date_to" class="form-label">Date To</label>
+                    <input type="date" class="form-control" id="date_to" name="date_to">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                        <a href="{{ url_for('invoices_page') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times"></i> Clear
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Invoices Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Invoice #</th>
+                            <th>Order #</th>
+                            <th>Customer</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Due Date</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for invoice in invoices %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('invoice_detail', invoice_id=invoice.id) }}" class="text-decoration-none fw-bold">
+                                    {{ invoice.invoice_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('order_detail', order_id=invoice.order_id) }}" class="text-decoration-none">
+                                    #{{ invoice.order_id }}
+                                </a>
+                            </td>
+                            <td>{{ invoice.customer_name }}</td>
+                            <td>
+                                <span class="fw-bold text-success">₵{{ "%.2f"|format(invoice.total_amount) }}</span>
+                            </td>
+                            <td>
+                                {% if invoice.status == 'paid' %}
+                                    <span class="badge bg-success">Paid</span>
+                                {% elif invoice.status == 'pending' %}
+                                    <span class="badge bg-warning">Pending</span>
+                                {% elif invoice.status == 'overdue' %}
+                                    <span class="badge bg-danger">Overdue</span>
+                                {% elif invoice.status == 'cancelled' %}
+                                    <span class="badge bg-secondary">Cancelled</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if invoice.due_date %}
+                                    <span class="{% if invoice.status == 'overdue' %}text-danger{% endif %}">
+                                        {{ invoice.due_date }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ invoice.created_at }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('invoice_detail', invoice_id=invoice.id) }}" 
+                                       class="btn btn-outline-primary" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button class="btn btn-outline-success" 
+                                            onclick="printInvoice({{ invoice.id }})" 
+                                            title="Print Invoice">
+                                        <i class="fas fa-print"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">
+                                <i class="fas fa-file-invoice fa-2x mb-3"></i>
+                                <p>No invoices found</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if pagination.pages > 1 %}
+            <nav aria-label="Invoices pagination">
+                <ul class="pagination justify-content-center">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('invoices_page', page=pagination.prev_num, status=current_status) }}">
+                            Previous
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('invoices_page', page=page_num, status=current_status) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('invoices_page', page=pagination.next_num, status=current_status) }}">
+                            Next
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function printInvoice(invoiceId) {
+    window.open(`/invoices/${invoiceId}/print`, '_blank');
+}
+
+function exportInvoices() {
+    // Get current filter parameters
+    const params = new URLSearchParams(window.location.search);
+    const exportUrl = `/invoices/export?${params.toString()}`;
+    
+    // Create a temporary link to download the file
+    const link = document.createElement('a');
+    link.href = exportUrl;
+    link.download = 'invoices_export.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Auto-submit form when filters change
+document.querySelectorAll('#status').forEach(select => {
+    select.addEventListener('change', function() {
+        this.closest('form').submit();
+    });
+});
+</script>
+{% endblock %} 

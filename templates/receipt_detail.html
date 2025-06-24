@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Receipt {{ receipt.receipt_number }} - ABZ Sales Portal{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Receipt {{ receipt.receipt_number }}</h1>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('order_detail', order_id=receipt.order_id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Order
+            </a>
+            <button class="btn btn-success" onclick="printReceipt()">
+                <i class="fas fa-print"></i> Print Receipt
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Receipt Details -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Receipt Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Customer:</h6>
+                            <p class="mb-1"><strong>{{ receipt.customer_name }}</strong></p>
+                            <p class="mb-1 text-muted">{{ receipt.customer_email }}</p>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <h6 class="text-muted">Receipt Information:</h6>
+                            <p class="mb-1"><strong>Receipt #:</strong> {{ receipt.receipt_number }}</p>
+                            <p class="mb-1"><strong>Order #:</strong> 
+                                <a href="{{ url_for('order_detail', order_id=receipt.order_id) }}">#{{ receipt.order_id }}</a>
+                            </p>
+                            <p class="mb-1"><strong>Date:</strong> {{ receipt.created_at }}</p>
+                            {% if receipt.reference_number %}
+                            <p class="mb-1"><strong>Reference:</strong> {{ receipt.reference_number }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Information -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Payment Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Payment Method</label>
+                                <p class="mb-0">
+                                    <span class="badge bg-info fs-6">{{ receipt.payment_method|title }}</span>
+                                </p>
+                            </div>
+                            {% if receipt.transaction_id %}
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Transaction ID</label>
+                                <p class="mb-0">{{ receipt.transaction_id }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            {% if receipt.notes %}
+                            <div class="mb-3">
+                                <label class="form-label text-muted">Notes</label>
+                                <p class="mb-0">{{ receipt.notes }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Receipt Summary -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Payment Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="text-muted">Previous Balance:</span>
+                        <span class="text-warning fw-bold">₵{{ "%.2f"|format(receipt.previous_balance) }}</span>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="text-muted">Payment Amount:</span>
+                        <span class="text-success fw-bold">-₵{{ "%.2f"|format(receipt.payment_amount) }}</span>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between mb-3">
+                        <h5 class="mb-0">Remaining Balance:</h5>
+                        <h5 class="mb-0 {% if receipt.remaining_balance > 0 %}text-danger{% else %}text-success{% endif %}">
+                            ₵{{ "%.2f"|format(receipt.remaining_balance) }}
+                        </h5>
+                    </div>
+
+                    {% if receipt.remaining_balance > 0 %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Outstanding Balance:</strong> ₵{{ "%.2f"|format(receipt.remaining_balance) }}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i>
+                        <strong>Fully Paid!</strong> No outstanding balance.
+                    </div>
+                    {% endif %}
+
+                    <div class="d-grid gap-2">
+                        {% if receipt.remaining_balance > 0 %}
+                        <a href="{{ url_for('process_payment', order_id=receipt.order_id) }}" class="btn btn-primary">
+                            <i class="fas fa-credit-card"></i> Make Additional Payment
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('receipts_page') }}" class="btn btn-outline-info">
+                            <i class="fas fa-receipt"></i> View All Receipts
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function printReceipt() {
+    window.open(`/receipts/{{ receipt.id }}/print`, '_blank');
+}
+</script>
+{% endblock %} 

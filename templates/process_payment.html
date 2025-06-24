@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}Process Payment - Order #{{ order.id }} - ABZ Sales Portal{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Process Payment</h1>
+        <a href="{{ url_for('order_detail', order_id=order.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Order
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Order Details -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Order Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Order ID:</strong> #{{ order.id }}
+                    </div>
+                    <div class="mb-3">
+                        <strong>Customer:</strong> {{ order.user.firstname }} {{ order.user.lastname }}
+                    </div>
+                    <div class="mb-3">
+                        <strong>Order Type:</strong> {{ order.ordertype.name }}
+                    </div>
+                    <div class="mb-3">
+                        <strong>Branch:</strong> {{ order.branch.name }}
+                    </div>
+                    <div class="mb-3">
+                        <strong>Status:</strong> 
+                        {% if order.approvalstatus %}
+                            <span class="badge bg-success">Approved</span>
+                        {% else %}
+                            <span class="badge bg-warning">Pending</span>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <strong>Payment Status:</strong> 
+                        {% if order.payment_status == 'paid' %}
+                            <span class="badge bg-success">Paid</span>
+                        {% elif order.payment_status == 'pending' %}
+                            <span class="badge bg-warning">Pending</span>
+                        {% elif order.payment_status == 'failed' %}
+                            <span class="badge bg-danger">Failed</span>
+                        {% elif order.payment_status == 'refunded' %}
+                            <span class="badge bg-secondary">Refunded</span>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <strong>Created:</strong> {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Items -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Order Items</h5>
+                </div>
+                <div class="card-body">
+                    {% for item in order.order_items %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong>{{ item.product.name }}</strong><br>
+                            <small class="text-muted">Qty: {{ item.quantity }} × ₵{{ item.product.sellingprice }}</small>
+                        </div>
+                        <div class="text-end">
+                            <strong>₵{{ "%.2f"|format(item.quantity * item.product.sellingprice) }}</strong>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Total Amount:</h6>
+                        <h5 class="mb-0 text-success">₵{{ "%.2f"|format(total_amount) }}</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Form -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Process Payment</h5>
+                </div>
+                <div class="card-body">
+                    <form id="paymentForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="amount" class="form-label">Amount *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₵</span>
+                                    <input type="number" class="form-control" id="amount" name="amount" 
+                                           value="{{ "%.2f"|format(total_amount) }}" step="0.01" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="payment_method" class="form-label">Payment Method *</label>
+                                <select class="form-select" id="payment_method" name="payment_method" required>
+                                    <option value="">Select Payment Method</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="card">Credit/Debit Card</option>
+                                    <option value="mobile_money">Mobile Money</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="transaction_id" class="form-label">Transaction ID</label>
+                                <input type="text" class="form-control" id="transaction_id" name="transaction_id" 
+                                       placeholder="External transaction reference">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="payment_date" class="form-label">Payment Date</label>
+                                <input type="datetime-local" class="form-control" id="payment_date" name="payment_date">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                      placeholder="Additional payment notes..."></textarea>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-credit-card"></i> Process Payment
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+                                <i class="fas fa-undo"></i> Reset
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Payment History -->
+            {% if payment_history %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Payment History</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Method</th>
+                                    <th>Status</th>
+                                    <th>Reference</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for payment in payment_history %}
+                                <tr>
+                                    <td>{{ payment.payment_date.strftime('%Y-%m-%d %H:%M') if payment.payment_date else payment.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>₵{{ "%.2f"|format(payment.amount) }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ payment.payment_method|title }}</span>
+                                    </td>
+                                    <td>
+                                        {% if payment.payment_status == 'completed' %}
+                                            <span class="badge bg-success">Completed</span>
+                                        {% elif payment.payment_status == 'pending' %}
+                                            <span class="badge bg-warning">Pending</span>
+                                        {% elif payment.payment_status == 'failed' %}
+                                            <span class="badge bg-danger">Failed</span>
+                                        {% elif payment.payment_status == 'refunded' %}
+                                            <span class="badge bg-secondary">Refunded</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ payment.reference_number }}</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('paymentForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = {
+        amount: parseFloat(formData.get('amount')),
+        payment_method: formData.get('payment_method'),
+        transaction_id: formData.get('transaction_id'),
+        notes: formData.get('notes')
+    };
+    
+    // Validate required fields
+    if (!data.amount || !data.payment_method) {
+        showToast('error', 'Please fill in all required fields');
+        return;
+    }
+    
+    if (data.amount <= 0) {
+        showToast('error', 'Amount must be greater than 0');
+        return;
+    }
+    
+    // Disable submit button
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    
+    fetch(`/orders/{{ order.id }}/payment`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('success', data.message);
+            setTimeout(() => {
+                window.location.href = `/orders/{{ order.id }}`;
+            }, 1500);
+        } else {
+            showToast('error', data.message);
+        }
+    })
+    .catch(error => {
+        showToast('error', 'Error processing payment');
+        console.error('Error:', error);
+    })
+    .finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+});
+
+function resetForm() {
+    document.getElementById('paymentForm').reset();
+    document.getElementById('amount').value = '{{ "%.2f"|format(total_amount) }}';
+}
+
+// Auto-format amount input
+document.getElementById('amount').addEventListener('input', function() {
+    let value = parseFloat(this.value);
+    if (isNaN(value) || value < 0) {
+        this.value = '0.00';
+    } else {
+        this.value = value.toFixed(2);
+    }
+});
+
+// Set current date and time for payment_date field
+document.addEventListener('DOMContentLoaded', function() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const currentDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+    
+    const paymentDateField = document.getElementById('payment_date');
+    if (paymentDateField) {
+        paymentDateField.value = currentDateTime;
+    }
+});
+</script>
+{% endblock %} 

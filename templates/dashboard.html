@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - ABZ Hardware{% endblock %}
+{% block content %}
+<h2>Dashboard</h2>
+
+<!-- Statistics Cards -->
+<div class="row g-4 mb-4">
+  <div class="col-md-2">
+    <div class="card text-bg-primary mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Total Orders</h5>
+        <p class="card-text fs-3">{{ stats.total_orders }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card text-bg-warning mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Pending Orders</h5>
+        <p class="card-text fs-3">{{ stats.pending_orders }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card text-bg-success mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Total Products</h5>
+        <p class="card-text fs-3">{{ stats.total_products }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card text-bg-danger mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Low Stock</h5>
+        <p class="card-text fs-3">{{ stats.low_stock_products }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card text-bg-info mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Total Payments</h5>
+        <p class="card-text fs-3">{{ stats.total_payments }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card text-bg-secondary mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Revenue</h5>
+        <p class="card-text fs-3">₵{{ "%.0f"|format(stats.total_revenue) }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card text-bg-dark mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Invoices</h5>
+        <p class="card-text fs-3">{{ stats.total_invoices }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="card text-bg-light mb-3">
+      <div class="card-body">
+        <h5 class="card-title">Receipts</h5>
+        <p class="card-text fs-3">{{ stats.total_receipts }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0">Quick Actions</h5>
+      </div>
+      <div class="card-body">
+        <a href="{{ url_for('create_order') }}" class="btn btn-primary me-2">Create New Order</a>
+        <a href="{{ url_for('orders_page') }}" class="btn btn-warning me-2">View Pending Orders</a>
+        <a href="{{ url_for('payments_page') }}" class="btn btn-info me-2">View Payments</a>
+        <a href="{{ url_for('stock_page') }}" class="btn btn-danger">Manage Stock</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Orders, Low Stock, and Recent Payments -->
+<div class="row">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Recent Orders</h5>
+        <a href="{{ url_for('orders_page') }}" class="btn btn-sm btn-outline-primary">View All</a>
+      </div>
+      <div class="card-body">
+        {% if recent_orders %}
+        <div class="list-group list-group-flush">
+          {% for order in recent_orders %}
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <strong>Order #{{ order.id }}</strong><br>
+              <small class="text-muted">{{ order.customer_name }}</small>
+            </div>
+            <div class="text-end">
+              <span class="badge {% if order.status == 'Approved' %}bg-success{% else %}bg-warning{% endif %}">
+                {{ order.status }}
+              </span><br>
+              <small class="text-muted">{{ order.created_at }}</small>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No recent orders.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Low Stock Alert</h5>
+        <a href="{{ url_for('stock_page') }}" class="btn btn-sm btn-outline-danger">Manage Stock</a>
+      </div>
+      <div class="card-body">
+        {% if low_stock_products %}
+        <div class="list-group list-group-flush">
+          {% for product in low_stock_products %}
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <strong>{{ product.name }}</strong>
+            </div>
+            <div class="text-end">
+              <span class="badge bg-danger">{{ product.stock }} left</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">All products have sufficient stock.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Recent Payments</h5>
+        <a href="{{ url_for('payments_page') }}" class="btn btn-sm btn-outline-info">View All</a>
+      </div>
+      <div class="card-body">
+        {% if recent_payments %}
+        <div class="list-group list-group-flush">
+          {% for payment in recent_payments %}
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <strong>Payment #{{ payment.id }}</strong><br>
+              <small class="text-muted">{{ payment.customer_name }}</small>
+            </div>
+            <div class="text-end">
+              <span class="badge {% if payment.status == 'completed' %}bg-success{% elif payment.status == 'pending' %}bg-warning{% else %}bg-danger{% endif %}">
+                {{ payment.status|title }}
+              </span><br>
+              <small class="text-success fw-bold">₵{{ "%.2f"|format(payment.amount) }}</small>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No recent payments.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Receipts - ABZ Sales Portal{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Receipts</h1>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" onclick="exportReceipts()">
+                <i class="fas fa-download"></i> Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Receipts Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Receipt #</th>
+                            <th>Order #</th>
+                            <th>Customer</th>
+                            <th>Payment Amount</th>
+                            <th>Previous Balance</th>
+                            <th>Remaining Balance</th>
+                            <th>Payment Method</th>
+                            <th>Reference</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for receipt in receipts %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('receipt_detail', receipt_id=receipt.id) }}" class="text-decoration-none fw-bold">
+                                    {{ receipt.receipt_number }}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('order_detail', order_id=receipt.order_id) }}" class="text-decoration-none">
+                                    #{{ receipt.order_id }}
+                                </a>
+                            </td>
+                            <td>{{ receipt.customer_name }}</td>
+                            <td>
+                                <span class="fw-bold text-success">₵{{ "%.2f"|format(receipt.payment_amount) }}</span>
+                            </td>
+                            <td>
+                                <span class="text-warning">₵{{ "%.2f"|format(receipt.previous_balance) }}</span>
+                            </td>
+                            <td>
+                                <span class="{% if receipt.remaining_balance > 0 %}text-danger{% else %}text-success{% endif %}">
+                                    ₵{{ "%.2f"|format(receipt.remaining_balance) }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ receipt.payment_method|title }}</span>
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ receipt.reference_number }}</small>
+                            </td>
+                            <td>{{ receipt.created_at }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('receipt_detail', receipt_id=receipt.id) }}" 
+                                       class="btn btn-outline-primary" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button class="btn btn-outline-success" 
+                                            onclick="printReceipt({{ receipt.id }})" 
+                                            title="Print Receipt">
+                                        <i class="fas fa-print"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="10" class="text-center text-muted py-4">
+                                <i class="fas fa-receipt fa-2x mb-3"></i>
+                                <p>No receipts found</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if pagination.pages > 1 %}
+            <nav aria-label="Receipts pagination">
+                <ul class="pagination justify-content-center">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('receipts_page', page=pagination.prev_num) }}">
+                            Previous
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('receipts_page', page=page_num) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('receipts_page', page=pagination.next_num) }}">
+                            Next
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function printReceipt(receiptId) {
+    window.open(`/receipts/${receiptId}/print`, '_blank');
+}
+
+function exportReceipts() {
+    // Get current filter parameters
+    const params = new URLSearchParams(window.location.search);
+    const exportUrl = `/receipts/export?${params.toString()}`;
+    
+    // Create a temporary link to download the file
+    const link = document.createElement('a');
+    link.href = exportUrl;
+    link.download = 'receipts_export.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+</script>
+{% endblock %} 

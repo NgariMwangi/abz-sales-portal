@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block title %}Create Order - ABZ Hardware{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Create New Order</h2>
+    <a href="{{ url_for('orders_page') }}" class="btn btn-secondary">Back to Orders</a>
+</div>
+
+<form id="createOrderForm" method="POST">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="order_type_id" class="form-label">Order Type</label>
+                        <select class="form-select" id="order_type_id" name="order_type_id" required>
+                            <option value="">Select Order Type</option>
+                            {% for order_type in order_types %}
+                            <option value="{{ order_type.id }}">{{ order_type.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="branch_id" class="form-label">Branch</label>
+                        <select class="form-select" id="branch_id" name="branch_id" required>
+                            <option value="">Select Branch</option>
+                            {% for branch in branches %}
+                            <option value="{{ branch.id }}">{{ branch.name }} - {{ branch.location }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Product Selection</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="category_filter" class="form-label">Filter by Category</label>
+                        <select class="form-select" id="category_filter">
+                            <option value="">All Categories</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="product_select" class="form-label">Product</label>
+                        <select class="form-select" id="product_select">
+                            <option value="">Select Product</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Quantity</label>
+                        <input type="number" class="form-control" id="quantity" min="1" value="1">
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="addProduct()">Add Product</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">Order Items</h5>
+        </div>
+        <div class="card-body">
+            <div id="orderItems">
+                <p class="text-muted">No items added yet.</p>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <h4>Total: $<span id="totalAmount">0.00</span></h4>
+                <button type="submit" class="btn btn-success" id="createOrderBtn" disabled>Create Order</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<input type="hidden" id="orderItemsData" name="items" value="[]">
+{% endblock %}
+
+{% block scripts %}
+<script>
+let orderItems = [];
+let products = [];
+
+// Load products when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadProducts();
+    
+    // Add event listeners
+    document.getElementById('category_filter').addEventListener('change', loadProducts);
+    document.getElementById('product_select').addEventListener('change', updateProductInfo);
+});
+
+function loadProducts() {
+    const categoryId = document.getElementById('category_filter').value;
+    const branchId = document.getElementById('branch_id').value;
+    
+    let url = '/api/products?';
+    if (categoryId) url += `category_id=${categoryId}&`;
+    if (branchId) url += `branch_id=${branchId}&`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            products = data;
+            updateProductSelect();
+        })
+        .catch(error => {
+            console.error('Error loading products:', error);
+        });
+}
+
+function updateProductSelect() {
+    const select = document.getElementById('product_select');
+    select.innerHTML = '<option value="">Select Product</option>';
+    
+    products.forEach(product => {
+        const option = document.createElement('option');
+        option.value = product.id;
+        option.textContent = `${product.name} - $${product.selling_price} (Stock: ${product.stock})`;
+        select.appendChild(option);
+    });
+}
+
+function updateProductInfo() {
+    const productId = document.getElementById('product_select').value;
+    const product = products.find(p => p.id == productId);
+    
+    if (product) {
+        document.getElementById('quantity').max = product.stock;
+        if (document.getElementById('quantity').value > product.stock) {
+            document.getElementById('quantity').value = product.stock;
+        }
+    }
+}
+
+function addProduct() {
+    const productId = document.getElementById('product_select').value;
+    const quantity = parseInt(document.getElementById('quantity').value);
+    
+    if (!productId) {
+        alert('Please select a product.');
+        return;
+    }
+    
+    if (!quantity || quantity < 1) {
+        alert('Please enter a valid quantity.');
+        return;
+    }
+    
+    const product = products.find(p => p.id == productId);
+    if (!product) {
+        alert('Product not found.');
+        return;
+    }
+    
+    if (quantity > product.stock) {
+        alert(`Only ${product.stock} units available in stock.`);
+        return;
+    }
+    
+    // Check if product already exists in order
+    const existingItem = orderItems.find(item => item.product_id == productId);
+    if (existingItem) {
+        existingItem.quantity += quantity;
+        if (existingItem.quantity > product.stock) {
+            alert(`Total quantity (${existingItem.quantity}) exceeds available stock (${product.stock}).`);
+            existingItem.quantity = product.stock;
+        }
+    } else {
+        orderItems.push({
+            product_id: parseInt(productId),
+            product_name: product.name,
+            quantity: quantity,
+            price: product.selling_price
+        });
+    }
+    
+    updateOrderItemsDisplay();
+    updateTotal();
+    
+    // Reset form
+    document.getElementById('product_select').value = '';
+    document.getElementById('quantity').value = '1';
+}
+
+function removeProduct(index) {
+    orderItems.splice(index, 1);
+    updateOrderItemsDisplay();
+    updateTotal();
+}
+
+function updateOrderItemsDisplay() {
+    const container = document.getElementById('orderItems');
+    
+    if (orderItems.length === 0) {
+        container.innerHTML = '<p class="text-muted">No items added yet.</p>';
+        return;
+    }
+    
+    let html = `
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    orderItems.forEach((item, index) => {
+        const total = item.quantity * item.price;
+        html += `
+            <tr>
+                <td>${item.product_name}</td>
+                <td>${item.quantity}</td>
+                <td>$${item.price.toFixed(2)}</td>
+                <td>$${total.toFixed(2)}</td>
+                <td>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removeProduct(${index})">
+                        Remove
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function updateTotal() {
+    const total = orderItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+    document.getElementById('totalAmount').textContent = total.toFixed(2);
+    document.getElementById('orderItemsData').value = JSON.stringify(orderItems);
+    document.getElementById('createOrderBtn').disabled = orderItems.length === 0;
+}
+
+// Handle form submission
+document.getElementById('createOrderForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (orderItems.length === 0) {
+        alert('Please add at least one product to the order.');
+        return;
+    }
+    
+    const formData = new FormData(this);
+    formData.set('items', JSON.stringify(orderItems));
+    
+    // Show loading state
+    const submitBtn = document.getElementById('createOrderBtn');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Creating...';
+    submitBtn.disabled = true;
+    
+    fetch('/orders/create', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert(`Order created successfully! Order ID: ${data.order_id}`);
+            window.location.href = `/orders/${data.order_id}`;
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while creating the order. Please try again.');
+    })
+    .finally(() => {
+        // Reset button state
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    });
+});
+
+// Update products when branch changes
+document.getElementById('branch_id').addEventListener('change', loadProducts);
+</script>
+{% endblock %} 

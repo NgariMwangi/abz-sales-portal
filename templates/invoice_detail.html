@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice {{ invoice.invoice_number }} - ABZ Sales Portal{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">Invoice {{ invoice.invoice_number }}</h1>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('order_detail', order_id=invoice.order_id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Order
+            </a>
+            <button class="btn btn-success" onclick="printInvoice()">
+                <i class="fas fa-print"></i> Print Invoice
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Invoice Details -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Invoice Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Bill To:</h6>
+                            <p class="mb-1"><strong>{{ invoice.customer_name }}</strong></p>
+                            <p class="mb-1 text-muted">{{ invoice.customer_email }}</p>
+                        </div>
+                        <div class="col-md-6 text-md-end">
+                            <h6 class="text-muted">Invoice Information:</h6>
+                            <p class="mb-1"><strong>Invoice #:</strong> {{ invoice.invoice_number }}</p>
+                            <p class="mb-1"><strong>Order #:</strong> 
+                                <a href="{{ url_for('order_detail', order_id=invoice.order_id) }}">#{{ invoice.order_id }}</a>
+                            </p>
+                            <p class="mb-1"><strong>Date:</strong> {{ invoice.created_at }}</p>
+                            {% if invoice.due_date %}
+                            <p class="mb-1"><strong>Due Date:</strong> {{ invoice.due_date }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invoice Items -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Invoice Items</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="text-center">Quantity</th>
+                                    <th class="text-end">Unit Price</th>
+                                    <th class="text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in invoice.order_items %}
+                                <tr>
+                                    <td>{{ item.product_name }}</td>
+                                    <td class="text-center">{{ item.quantity }}</td>
+                                    <td class="text-end">₵{{ "%.2f"|format(item.price) }}</td>
+                                    <td class="text-end">₵{{ "%.2f"|format(item.total) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Summary -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Invoice Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal:</span>
+                        <span>₵{{ "%.2f"|format(invoice.subtotal) }}</span>
+                    </div>
+                    {% if invoice.tax_amount > 0 %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Tax:</span>
+                        <span>₵{{ "%.2f"|format(invoice.tax_amount) }}</span>
+                    </div>
+                    {% endif %}
+                    {% if invoice.discount_amount > 0 %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Discount:</span>
+                        <span class="text-success">-₵{{ "%.2f"|format(invoice.discount_amount) }}</span>
+                    </div>
+                    {% endif %}
+                    <hr>
+                    <div class="d-flex justify-content-between mb-3">
+                        <h5 class="mb-0">Total:</h5>
+                        <h5 class="mb-0 text-success">₵{{ "%.2f"|format(invoice.total_amount) }}</h5>
+                    </div>
+
+                    <div class="mb-3">
+                        <span class="badge {% if invoice.status == 'paid' %}bg-success{% elif invoice.status == 'pending' %}bg-warning{% elif invoice.status == 'overdue' %}bg-danger{% else %}bg-secondary{% endif %} fs-6">
+                            {{ invoice.status|title }}
+                        </span>
+                    </div>
+
+                    {% if invoice.notes %}
+                    <div class="mb-3">
+                        <h6>Notes:</h6>
+                        <p class="text-muted">{{ invoice.notes }}</p>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('process_payment', order_id=invoice.order_id) }}" class="btn btn-primary">
+                            <i class="fas fa-credit-card"></i> Process Payment
+                        </a>
+                        <a href="{{ url_for('receipts_page') }}" class="btn btn-outline-info">
+                            <i class="fas fa-receipt"></i> View Receipts
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function printInvoice() {
+    window.open(`/invoices/{{ invoice.id }}/print`, '_blank');
+}
+</script>
+{% endblock %} 
