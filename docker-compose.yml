@@ -3,7 +3,7 @@ services:
     web:
         build: .
         # env_file: .env
-        container_name: kips
+        container_name: abz-sales-portal
         restart: always
         ports:
             - 5060:80
