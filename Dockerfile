@@ -10,12 +10,9 @@ RUN pip install flask_sqlalchemy cryptography
 # Copy app code
 COPY . .
 
-# Create a non-root user
+# Optional: Add non-root user (but don't switch to it)
 RUN adduser --disabled-password --gecos '' appuser
 
-# Set environment variables to drop privileges
+# Drop privileges for uWSGI only (safe)
 ENV UWSGI_UID=appuser
 ENV UWSGI_GID=appuser
-
-# Switch to non-root user
-USER appuser
