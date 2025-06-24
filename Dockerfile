@@ -1,16 +1,21 @@
 FROM tiangolo/uwsgi-nginx-flask:python3.10
 
-# copy over our requirements.txt file
+# Copy requirements
 COPY requirements.txt /tmp/
 
-ENV OAUTHLIB_INSECURE_TRANSPORT=0
-
-# upgrade pip and install required python packages
-# RUN pip install -U pip
+# Install dependencies
 RUN pip install -r /tmp/requirements.txt
-RUN pip install flask_sqlalchemy
-RUN pip install cryptography
+RUN pip install flask_sqlalchemy cryptography
 
-
-# copy over our org code
+# Copy app code
 COPY . .
+
+# Create a non-root user
+RUN adduser --disabled-password --gecos '' appuser
+
+# Set environment variables to drop privileges
+ENV UWSGI_UID=appuser
+ENV UWSGI_GID=appuser
+
+# Switch to non-root user
+USER appuser
