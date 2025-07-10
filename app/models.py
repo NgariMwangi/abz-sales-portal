@@ -1,5 +1,7 @@
-from main import db
+from app import db
 from datetime import datetime
+import secrets
+import string
 
 
 class Branch(db.Model):
@@ -28,9 +30,10 @@ class User(db.Model):
     firstname = db.Column(db.String, nullable=False)
     lastname = db.Column(db.String, nullable=False)
     password = db.Column(db.String, nullable=False)
+    phone = db.Column(db.String, nullable=True)
     role = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    phone = db.Column(db.String, nullable=True)
+    # phone = db.Column(db.String, nullable=True)
     orders = db.relationship('Order', backref='user', lazy=True)
     stock_transactions = db.relationship('StockTransaction', backref='user', lazy=True)
     payments = db.relationship('Payment', backref='user', lazy=True)
@@ -49,6 +52,28 @@ class User(db.Model):
 
     def get_id(self):
         return str(self.id)
+
+
+class PasswordReset(db.Model):
+    __tablename__ = 'password_resets'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token = db.Column(db.String(255), nullable=False, unique=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref='password_resets')
+    
+    @staticmethod
+    def generate_token():
+        """Generate a secure random token"""
+        alphabet = string.ascii_letters + string.digits
+        return ''.join(secrets.choice(alphabet) for _ in range(32))
+    
+    def is_expired(self):
+        """Check if the token has expired"""
+        return datetime.utcnow() > self.expires_at
 
 
 class Product(db.Model):
@@ -112,7 +137,12 @@ class OrderItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     orderid = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
     productid = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
-    quantity= db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    buying_price = db.Column(db.Numeric(10, 2), nullable=True)  # Product buying price at time of order
+    original_price = db.Column(db.Numeric(10, 2), nullable=False)  # Original product selling price
+    negotiated_price = db.Column(db.Numeric(10, 2), nullable=False)  # Negotiated price (if any)
+    final_price = db.Column(db.Numeric(10, 2), nullable=False)  # Final price used for calculation
+    negotiation_notes = db.Column(db.String, nullable=False)  # Notes about the negotiation
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -167,4 +197,39 @@ class Receipt(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     payment = db.relationship('Payment', backref='receipts', lazy=True)
-    order = db.relationship('Order', backref='receipts', lazy=True)
+    order = db.relationship('Order', backref='receipts', lazy=True) 
+
+class Delivery(db.Model):
+    __tablename__ = 'deliveries'
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
+    delivery_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    delivery_location = db.Column(db.String, nullable=False)
+    customer_phone = db.Column(db.String, nullable=False)
+    delivery_status = db.Column(db.String, default='pending')  # pending, in_transit, delivered, cancelled, failed
+    payment_status = db.Column(db.String, default='pending')  # pending, paid, failed, refunded
+    agreed_delivery_time = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    notes = db.Column(db.String, nullable=True)
+
+    order = db.relationship('Order', backref='deliveries', lazy=True)
+
+
+class DeliveryPayment(db.Model):
+    __tablename__ = 'delivery_payments'
+    id = db.Column(db.Integer, primary_key=True)
+    delivery_id = db.Column(db.Integer, db.ForeignKey('deliveries.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    payment_method = db.Column(db.String, nullable=False)  # cash, card, mobile_money, bank_transfer
+    payment_status = db.Column(db.String, nullable=False)  # pending, completed, failed, refunded
+    transaction_id = db.Column(db.String, nullable=True)  # External payment gateway transaction ID
+    reference_number = db.Column(db.String, nullable=True)  # Internal reference number
+    notes = db.Column(db.String, nullable=True)
+    payment_date = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    delivery = db.relationship('Delivery', backref='payments', lazy=True)
+    user = db.relationship('User', backref='delivery_payments', lazy=True)

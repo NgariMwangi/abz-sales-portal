@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ABZ Hardware - Sales Portal Login</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -18,7 +19,7 @@
         .login-container {
             background: white;
             padding: 40px;
-            border-radius: 10px;
+            border-radius: 15px;
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
             width: 100%;
             max-width: 400px;
@@ -41,17 +42,30 @@
             color: #555;
             font-weight: bold;
         }
+        .input-group {
+            position: relative;
+        }
+        .input-group-text {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #667eea;
+            z-index: 10;
+        }
         input {
             width: 100%;
-            padding: 12px;
+            padding: 12px 12px 12px 40px;
             border: 2px solid #ddd;
-            border-radius: 5px;
+            border-radius: 10px;
             font-size: 16px;
             box-sizing: border-box;
+            transition: all 0.3s ease;
         }
         input:focus {
             outline: none;
             border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
         }
         button {
             width: 100%;
@@ -59,19 +73,38 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 10px;
             font-size: 16px;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: all 0.3s ease;
+            font-weight: 600;
         }
         button:hover {
             transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
         .error {
             color: #e74c3c;
             text-align: center;
             margin-top: 10px;
             display: none;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .forgot-password {
+            text-align: center;
+            margin-top: 15px;
+        }
+        .forgot-password a {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .forgot-password a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -84,14 +117,26 @@
         <form id="loginForm">
             <div class="form-group">
                 <label for="email">Email</label>
-                <input type="email" id="email" name="email" required>
+                <div class="input-group">
+                    <i class="fas fa-envelope input-group-text"></i>
+                    <input type="email" id="email" name="email" required>
+                </div>
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
+                <div class="input-group">
+                    <i class="fas fa-lock input-group-text"></i>
+                    <input type="password" id="password" name="password" required>
+                </div>
             </div>
-            <button type="submit">Login</button>
+            <button type="submit">
+                <i class="fas fa-sign-in-alt me-2"></i>
+                Login
+            </button>
         </form>
+        <div class="forgot-password">
+            <a href="/forgot-password">Forgot Password?</a>
+        </div>
         <div id="error" class="error"></div>
     </div>
 

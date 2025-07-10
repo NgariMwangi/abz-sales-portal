@@ -66,8 +66,8 @@
                                 <tr>
                                     <td>{{ item.product_name }}</td>
                                     <td class="text-center">{{ item.quantity }}</td>
-                                    <td class="text-end">₵{{ "%.2f"|format(item.price) }}</td>
-                                    <td class="text-end">₵{{ "%.2f"|format(item.total) }}</td>
+                                    <td class="text-end">KSh{{ "%.2f"|format(item.price) }}</td>
+                                    <td class="text-end">KSh{{ "%.2f"|format(item.total) }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -86,24 +86,24 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between mb-2">
                         <span>Subtotal:</span>
-                        <span>₵{{ "%.2f"|format(invoice.subtotal) }}</span>
+                        <span>KSh{{ "%.2f"|format(invoice.subtotal) }}</span>
                     </div>
                     {% if invoice.tax_amount > 0 %}
                     <div class="d-flex justify-content-between mb-2">
                         <span>Tax:</span>
-                        <span>₵{{ "%.2f"|format(invoice.tax_amount) }}</span>
+                        <span>KSh{{ "%.2f"|format(invoice.tax_amount) }}</span>
                     </div>
                     {% endif %}
                     {% if invoice.discount_amount > 0 %}
                     <div class="d-flex justify-content-between mb-2">
                         <span>Discount:</span>
-                        <span class="text-success">-₵{{ "%.2f"|format(invoice.discount_amount) }}</span>
+                        <span class="text-success">-KSh{{ "%.2f"|format(invoice.discount_amount) }}</span>
                     </div>
                     {% endif %}
                     <hr>
                     <div class="d-flex justify-content-between mb-3">
                         <h5 class="mb-0">Total:</h5>
-                        <h5 class="mb-0 text-success">₵{{ "%.2f"|format(invoice.total_amount) }}</h5>
+                        <h5 class="mb-0 text-success">KSh{{ "%.2f"|format(invoice.total_amount) }}</h5>
                     </div>
 
                     <div class="mb-3">

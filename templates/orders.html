@@ -83,8 +83,17 @@
                             <div class="btn-group" role="group">
                                 <a href="{{ url_for('order_detail', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">View</a>
                                 {% if order.status == 'Pending' %}
-                                <button class="btn btn-sm btn-success" onclick="approveOrder({{ order.id }})">Approve</button>
-                                <button class="btn btn-sm btn-danger" onclick="rejectOrder({{ order.id }})">Reject</button>
+                                    <a href="{{ url_for('negotiate_order_prices', order_id=order.id) }}" class="btn btn-sm btn-warning">
+                                        <i class="fas fa-handshake"></i> Negotiate
+                                    </a>
+                                    {% if order.order_type|lower == 'online' %}
+                                    <a href="{{ url_for('select_fulfillment_branch', order_id=order.id) }}" class="btn btn-sm btn-success">
+                                        <i class="fas fa-store"></i> Select Branch
+                                    </a>
+                                    {% else %}
+                                    <button class="btn btn-sm btn-success" onclick="approveOrder({{ order.id }})">Approve</button>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-danger" onclick="rejectOrder({{ order.id }})">Reject</button>
                                 {% endif %}
                             </div>
                         </td>

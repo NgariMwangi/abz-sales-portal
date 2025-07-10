@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}Create Delivery - ABZ Hardware{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Create New Delivery</h2>
+    <div>
+        <a href="{{ url_for('deliveries_page') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Back to Deliveries
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-truck me-2"></i>Delivery Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('create_delivery') }}">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="order_id" class="form-label">Order ID *</label>
+                                <select class="form-select" id="order_id" name="order_id" required>
+                                    <option value="">Select an order</option>
+                                    {% for order in available_orders %}
+                                    <option value="{{ order.id }}" {% if selected_order_id == order.id %}selected{% endif %}>
+                                        #{{ order.id }} - {{ order.customer_name }} ({{ order.order_type }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">Select the order for which you want to create a delivery</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="delivery_amount" class="form-label">Delivery Amount (KSh) *</label>
+                                <input type="number" class="form-control" id="delivery_amount" name="delivery_amount" 
+                                       step="0.01" min="0" value="{{ form.delivery_amount or '' }}" required>
+                                <div class="form-text">Enter the delivery fee amount</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="customer_phone" class="form-label">Customer Phone *</label>
+                                <input type="tel" class="form-control" id="customer_phone" name="customer_phone" 
+                                       value="{{ form.customer_phone or '' }}" required>
+                                <div class="form-text">Customer's contact phone number</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="agreed_delivery_time" class="form-label">Agreed Delivery Time</label>
+                                <input type="datetime-local" class="form-control" id="agreed_delivery_time" 
+                                       name="agreed_delivery_time" value="{{ form.agreed_delivery_time or '' }}">
+                                <div class="form-text">When the delivery is agreed to be made</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Delivery Location *</label>
+                        <textarea class="form-control" id="location" name="delivery_location" rows="3" required>{{ form.location or '' }}</textarea>
+                        <div class="form-text">Full delivery address and location details</div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="delivery_status" class="form-label">Delivery Status</label>
+                                <select class="form-select" id="delivery_status" name="delivery_status">
+                                    <option value="pending" {% if form.delivery_status == 'pending' %}selected{% endif %}>Pending</option>
+                                    <option value="in_transit" {% if form.delivery_status == 'in_transit' %}selected{% endif %}>In Transit</option>
+                                    <option value="delivered" {% if form.delivery_status == 'delivered' %}selected{% endif %}>Delivered</option>
+                                    <option value="cancelled" {% if form.delivery_status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="payment_status" class="form-label">Payment Status</label>
+                                <select class="form-select" id="payment_status" name="payment_status">
+                                    <option value="pending" {% if form.payment_status == 'pending' %}selected{% endif %}>Pending</option>
+                                    <option value="paid" {% if form.payment_status == 'paid' %}selected{% endif %}>Paid</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle me-1"></i>Create Delivery
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Order Information Preview -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Order Information</h6>
+            </div>
+            <div class="card-body">
+                <div id="order-preview">
+                    <p class="text-muted">Select an order to see details</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Information -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-question-circle me-2"></i>Help</h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <small class="text-muted">
+                            <i class="bi bi-1-circle me-1"></i>Select an order that needs delivery
+                        </small>
+                    </li>
+                    <li class="mb-2">
+                        <small class="text-muted">
+                            <i class="bi bi-2-circle me-1"></i>Enter delivery amount and customer details
+                        </small>
+                    </li>
+                    <li class="mb-2">
+                        <small class="text-muted">
+                            <i class="bi bi-3-circle me-1"></i>Set delivery location and agreed time
+                        </small>
+                    </li>
+                    <li class="mb-2">
+                        <small class="text-muted">
+                            <i class="bi bi-4-circle me-1"></i>Choose initial status and payment status
+                        </small>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Order preview functionality
+document.getElementById('order_id').addEventListener('change', function() {
+    const orderId = this.value;
+    const previewDiv = document.getElementById('order-preview');
+    
+    if (orderId) {
+        // Fetch order details
+        fetch(`/api/orders/${orderId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const order = data.order;
+                    previewDiv.innerHTML = `
+                        <p><strong>Customer:</strong> ${order.customer_name}</p>
+                        <p><strong>Order Type:</strong> ${order.order_type}</p>
+                        <p><strong>Branch:</strong> ${order.branch}</p>
+                        <p><strong>Total Amount:</strong> KSh ${parseFloat(order.total_amount).toFixed(2)}</p>
+                        <p><strong>Status:</strong> <span class="badge ${order.status === 'Approved' ? 'bg-success' : 'bg-warning'}">${order.status}</span></p>
+                        <p><strong>Created:</strong> ${new Date(order.created_at).toLocaleDateString()}</p>
+                    `;
+                } else {
+                    previewDiv.innerHTML = '<p class="text-danger">Error loading order details</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                previewDiv.innerHTML = '<p class="text-danger">Error loading order details</p>';
+            });
+    } else {
+        previewDiv.innerHTML = '<p class="text-muted">Select an order to see details</p>';
+    }
+});
+
+// Auto-fill customer phone if available
+document.getElementById('order_id').addEventListener('change', function() {
+    const orderId = this.value;
+    if (orderId) {
+        fetch(`/api/orders/${orderId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.order.customer_phone) {
+                    document.getElementById('customer_phone').value = data.order.customer_phone;
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Negotiate Prices - Order #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Negotiate Prices - Order #{{ order.id }}</h2>
+        <a href="{{ url_for('order_detail', order_id=order.id) }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Order
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Customer:</strong> {{ order.user.firstname }} {{ order.user.lastname }}</p>
+                            <p><strong>Order Type:</strong> {{ order.ordertype.name }}</p>
+                            <p><strong>Branch:</strong> {{ order.branch.name }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Created:</strong> {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                            <p><strong>Status:</strong> 
+                                {% if order.approvalstatus %}
+                                    <span class="badge bg-success">Approved</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Pending</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form id="negotiationForm" method="POST">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Price Negotiation</h5>
+                        <small class="text-muted">Adjust prices for individual items. Only pending orders can be negotiated.</small>
+                    </div>
+                    <div class="card-body">
+                        {% if order.approvalstatus %}
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                This order has been approved and cannot be negotiated.
+                            </div>
+                        {% else %}
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Product</th>
+                                            <th>Quantity</th>
+                                            <th>Original Price</th>
+                                            <th>Negotiated Price</th>
+                                            <th>Final Price</th>
+                                            <th>Total</th>
+                                            <th>Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in order_items %}
+                                        <tr>
+                                            <td>{{ item.product_name }}</td>
+                                            <td>{{ item.quantity }}</td>
+                                            <td>KSh{{ "%.2f"|format(item.original_price) }}</td>
+                                            <td>
+                                                <input type="number" 
+                                                       class="form-control negotiated-price" 
+                                                       name="negotiated_price_{{ item.id }}"
+                                                       value="{{ "%.2f"|format(item.negotiated_price) if item.negotiated_price else "%.2f"|format(item.original_price) }}"
+                                                       step="0.01" 
+                                                       min="0"
+                                                       data-original-price="{{ item.original_price }}"
+                                                       data-item-id="{{ item.id }}">
+                                            </td>
+                                            <td class="final-price">KSh{{ "%.2f"|format(item.final_price) }}</td>
+                                            <td class="item-total">KSh{{ "%.2f"|format(item.total) }}</td>
+                                            <td>
+                                                <input type="text" 
+                                                       class="form-control" 
+                                                       name="notes_{{ item.id }}"
+                                                       value="{{ item.negotiation_notes or '' }}"
+                                                       placeholder="Negotiation notes...">
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot class="table-light">
+                                        <tr>
+                                            <td colspan="5" class="text-end"><strong>Order Total:</strong></td>
+                                            <td><strong id="orderTotal">KSh{{ "%.2f"|format(order_items|sum(attribute='total')) }}</strong></td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" onclick="resetPrices()">
+                                    <i class="fas fa-undo"></i> Reset to Original Prices
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Save Negotiated Prices
+                                </button>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle price changes
+    const priceInputs = document.querySelectorAll('.negotiated-price');
+    priceInputs.forEach(input => {
+        input.addEventListener('input', updatePrices);
+    });
+
+    // Handle form submission
+    document.getElementById('negotiationForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveNegotiations();
+    });
+});
+
+function updatePrices() {
+    let orderTotal = 0;
+    
+    document.querySelectorAll('tbody tr').forEach(row => {
+        const priceInput = row.querySelector('.negotiated-price');
+        const quantity = parseInt(row.cells[1].textContent);
+        const originalPrice = parseFloat(priceInput.dataset.originalPrice);
+        const negotiatedPrice = parseFloat(priceInput.value) || originalPrice;
+        
+        // Update final price display
+        const finalPriceCell = row.querySelector('.final-price');
+        finalPriceCell.textContent = 'KSh' + negotiatedPrice.toFixed(2);
+        
+        // Update item total
+        const itemTotal = quantity * negotiatedPrice;
+        const itemTotalCell = row.querySelector('.item-total');
+        itemTotalCell.textContent = 'KSh' + itemTotal.toFixed(2);
+        
+        orderTotal += itemTotal;
+    });
+    
+    // Update order total
+    document.getElementById('orderTotal').textContent = 'KSh' + orderTotal.toFixed(2);
+}
+
+function resetPrices() {
+    if (confirm('Are you sure you want to reset all prices to their original values?')) {
+        document.querySelectorAll('.negotiated-price').forEach(input => {
+            const originalPrice = parseFloat(input.dataset.originalPrice);
+            input.value = originalPrice.toFixed(2);
+        });
+        
+        document.querySelectorAll('input[name^="notes_"]').forEach(input => {
+            input.value = '';
+        });
+        
+        updatePrices();
+    }
+}
+
+function saveNegotiations() {
+    const negotiations = [];
+    
+    document.querySelectorAll('tbody tr').forEach(row => {
+        const priceInput = row.querySelector('.negotiated-price');
+        const notesInput = row.querySelector('input[name^="notes_"]');
+        const originalPrice = parseFloat(priceInput.dataset.originalPrice);
+        const negotiatedPrice = parseFloat(priceInput.value) || originalPrice;
+        
+        // Only include if price has changed or notes exist
+        if (negotiatedPrice !== originalPrice || (notesInput.value && notesInput.value.trim())) {
+            negotiations.push({
+                order_item_id: priceInput.dataset.itemId,
+                new_price: negotiatedPrice,
+                notes: notesInput.value.trim()
+            });
+        }
+    });
+    
+    if (negotiations.length === 0) {
+        alert('No changes detected. Please modify prices or add notes before saving.');
+        return;
+    }
+    
+    // Show loading state
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    submitBtn.disabled = true;
+    
+    // Send AJAX request
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ negotiations: negotiations })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            window.location.href = '{{ url_for("order_detail", order_id=order.id) }}';
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while saving negotiations.');
+    })
+    .finally(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+}
+</script>
+{% endblock %} 

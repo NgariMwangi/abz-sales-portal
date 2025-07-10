@@ -36,7 +36,7 @@
                         <div class="col-md-6 text-md-end">
                             <h6 class="text-muted">Payment Information:</h6>
                             <p class="mb-1"><strong>Amount:</strong> 
-                                <span class="text-success fw-bold">₵{{ "%.2f"|format(payment.amount) }}</span>
+                                <span class="text-success fw-bold">KSh{{ "%.2f"|format(payment.amount) }}</span>
                             </p>
                             <p class="mb-1"><strong>Method:</strong> 
                                 <span class="badge bg-info">{{ payment.payment_method|title }}</span>
@@ -99,7 +99,7 @@
                 </div>
                 <div class="card-body">
                     <div class="text-center mb-3">
-                        <h3 class="text-success">₵{{ "%.2f"|format(payment.amount) }}</h3>
+                        <h3 class="text-success">KSh{{ "%.2f"|format(payment.amount) }}</h3>
                         <p class="text-muted">Payment Amount</p>
                     </div>
 
@@ -152,7 +152,7 @@
             </div>
             <div class="modal-body">
                 <p>Are you sure you want to refund this payment? This action cannot be undone.</p>
-                <p><strong>Payment Amount:</strong> ₵{{ "%.2f"|format(payment.amount) }}</p>
+                <p><strong>Payment Amount:</strong> KSh{{ "%.2f"|format(payment.amount) }}</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

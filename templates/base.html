@@ -112,6 +112,16 @@
                 <i class="bi bi-receipt me-1"></i>Receipts
             </a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'deliveries_page' or request.endpoint == 'delivery_detail' or request.endpoint == 'create_delivery' %}active{% endif %}" href="/deliveries">
+                <i class="bi bi-truck me-1"></i>Deliveries
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'delivery_payments_page' or request.endpoint == 'delivery_payment_detail' %}active{% endif %}" href="/delivery-payments">
+                <i class="bi bi-credit-card me-1"></i>Delivery Payments
+            </a>
+        </li>
       </ul>
       <div class="navbar-nav">
         <span class="navbar-text me-3">

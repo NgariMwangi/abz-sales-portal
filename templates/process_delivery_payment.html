@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Process Delivery Payment - ABZ Hardware{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Process Delivery Payment</h2>
+    <div>
+        <a href="{{ url_for('delivery_detail', delivery_id=delivery.id) }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Back to Delivery
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-credit-card me-2"></i>Payment Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('process_delivery_payment_new', delivery_id=delivery.id) }}">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="amount" class="form-label">Payment Amount (KSh) *</label>
+                                <input type="number" class="form-control" id="amount" name="amount" 
+                                       step="0.01" min="0" value="{{ "%.2f"|format(delivery.delivery_amount) }}" required readonly>
+                                <div class="form-text">Delivery amount (cannot be modified)</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="payment_method" class="form-label">Payment Method *</label>
+                                <select class="form-select" id="payment_method" name="payment_method" required>
+                                    <option value="">Select payment method</option>
+                                    <option value="cash">Cash</option>
+                                    <option value="card">Credit/Debit Card</option>
+                                    <option value="mobile_money">Mobile Money</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                </select>
+                                <div class="form-text">Choose how the customer will pay</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="transaction_id" class="form-label">Transaction ID</label>
+                        <input type="text" class="form-control" id="transaction_id" name="transaction_id">
+                        <div class="form-text">External transaction reference (optional)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="reference_number" class="form-label">Reference Number</label>
+                        <input type="text" class="form-control" id="reference_number" name="reference_number">
+                        <div class="form-text">Internal reference number (optional)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                        <div class="form-text">Additional notes about this payment</div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle me-1"></i>Process Payment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Delivery Information -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-truck me-2"></i>Delivery Information</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Delivery ID:</strong> #{{ delivery.id }}</p>
+                <p><strong>Order ID:</strong> 
+                    <a href="{{ url_for('order_detail', order_id=delivery.order_id) }}">#{{ delivery.order_id }}</a>
+                </p>
+                <p><strong>Customer:</strong> {{ delivery.order.user.firstname }} {{ delivery.order.user.lastname }}</p>
+                <p><strong>Customer Phone:</strong> {{ delivery.customer_phone }}</p>
+                <p><strong>Location:</strong> {{ delivery.delivery_location }}</p>
+                <p><strong>Delivery Amount:</strong> KSh {{ "%.2f"|format(delivery.delivery_amount) }}</p>
+                <p><strong>Delivery Status:</strong> 
+                    <span class="badge 
+                        {% if delivery.delivery_status == 'delivered' %}bg-success
+                        {% elif delivery.delivery_status == 'in_transit' %}bg-info
+                        {% elif delivery.delivery_status == 'cancelled' %}bg-danger
+                        {% else %}bg-warning{% endif %}">
+                        {{ delivery.delivery_status.replace('_', ' ').title() }}
+                    </span>
+                </p>
+                <p><strong>Payment Status:</strong> 
+                    <span class="badge {% if delivery.payment_status == 'paid' %}bg-success{% else %}bg-warning{% endif %}">
+                        {{ delivery.payment_status.title() }}
+                    </span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-cart me-2"></i>Order Summary</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Order Type:</strong> {{ delivery.order.ordertype.name }}</p>
+                <p><strong>Branch:</strong> {{ delivery.order.branch.name }}</p>
+                <p><strong>Order Status:</strong> 
+                    <span class="badge {% if delivery.order.approvalstatus %}bg-success{% else %}bg-warning{% endif %}">
+                        {% if delivery.order.approvalstatus %}Approved{% else %}Pending{% endif %}
+                    </span>
+                </p>
+                <p><strong>Order Created:</strong> {{ delivery.order.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Form validation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const paymentMethod = document.getElementById('payment_method').value;
+    const amount = document.getElementById('amount').value;
+    
+    if (!paymentMethod) {
+        e.preventDefault();
+        alert('Please select a payment method.');
+        return;
+    }
+    
+    if (!amount || amount <= 0) {
+        e.preventDefault();
+        alert('Please enter a valid payment amount.');
+        return;
+    }
+    
+    // Confirm payment processing
+    if (!confirm('Are you sure you want to process this payment?')) {
+        e.preventDefault();
+        return;
+    }
+});
+
+// Auto-generate reference number
+document.getElementById('reference_number').addEventListener('focus', function() {
+    if (!this.value) {
+        const now = new Date();
+        const ref = 'DEL-PAY-' + now.getFullYear() + 
+                   String(now.getMonth() + 1).padStart(2, '0') + 
+                   String(now.getDate()).padStart(2, '0') + '-' + 
+                   String(now.getHours()).padStart(2, '0') + 
+                   String(now.getMinutes()).padStart(2, '0') + 
+                   String(now.getSeconds()).padStart(2, '0');
+        this.value = ref;
+    }
+});
+</script>
+{% endblock %} 

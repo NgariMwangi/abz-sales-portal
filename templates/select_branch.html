@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Select Fulfillment Branches - Order #{{ order.id }} - ABZ Hardware{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Select Fulfillment Branches</h2>
+    <div>
+        <a href="{{ url_for('order_detail', order_id=order.id) }}" class="btn btn-secondary">Back to Order</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Order #{{ order.id }} - {{ order.user.firstname }} {{ order.user.lastname }}</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Order Type:</strong> {{ order.ordertype.name }}</p>
+                        <p><strong>Created:</strong> {{ order.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Items:</strong> {{ order.order_items|length }} products</p>
+                        <p><strong>Total Amount:</strong> KSh{{ "%.2f"|format(order.order_items|sum(attribute='quantity') * order.order_items[0].product.sellingprice if order.order_items else 0) }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Select Branch for Each Product</h5>
+                <small class="text-muted">Choose which branch will fulfill each product in this order</small>
+            </div>
+            <div class="card-body">
+                <form id="branchSelectionForm">
+                    {% for item_data in order_items_with_branches %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">{{ item_data.item.product.name }}</h6>
+                            <small class="text-muted">Quantity: {{ item_data.item.quantity }} | Price: KSh{{ "%.2f"|format(item_data.item.product.sellingprice) }}</small>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% for branch_info in item_data.branches %}
+                                <div class="col-md-4 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" 
+                                               name="item_{{ item_data.item.id }}" 
+                                               id="item_{{ item_data.item.id }}_branch_{{ branch_info.branch.id }}"
+                                               value="{{ branch_info.branch.id }}"
+                                               {% if branch_info.is_sufficient %}data-sufficient="true"{% else %}disabled{% endif %}>
+                                        <label class="form-check-label" for="item_{{ item_data.item.id }}_branch_{{ branch_info.branch.id }}">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>{{ branch_info.branch.name }}</strong><br>
+                                                    <small class="text-muted">{{ branch_info.branch.location }}</small>
+                                                </div>
+                                                <div class="text-end">
+                                                    <span class="badge {% if branch_info.is_sufficient %}bg-success{% else %}bg-danger{% endif %}">
+                                                        {{ branch_info.available_stock }} available
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            {% if not branch_info.is_sufficient %}
+                                            <small class="text-danger">
+                                                {% if branch_info.available_stock == 0 %}
+                                                    Not available
+                                                {% else %}
+                                                    Insufficient stock (need {{ item_data.item.quantity }})
+                                                {% endif %}
+                                            </small>
+                                            {% endif %}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">Select a branch with sufficient stock for this product</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="button" class="btn btn-secondary" onclick="window.history.back()">Cancel</button>
+                        <button type="submit" class="btn btn-success" id="approveBtn">
+                            <i class="fas fa-check"></i> Approve Order
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('branchSelectionForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Collect branch selections for each item
+    const itemBranchSelections = {};
+    let allItemsHaveSelection = true;
+    let missingSelections = [];
+    
+    {% for item_data in order_items_with_branches %}
+    const selectedBranch_{{ item_data.item.id }} = document.querySelector('input[name="item_{{ item_data.item.id }}"]:checked');
+    if (selectedBranch_{{ item_data.item.id }}) {
+        itemBranchSelections['{{ item_data.item.id }}'] = selectedBranch_{{ item_data.item.id }}.value;
+    } else {
+        allItemsHaveSelection = false;
+        missingSelections.push('{{ item_data.item.product.name }}');
+    }
+    {% endfor %}
+    
+    if (!allItemsHaveSelection) {
+        alert('Please select a branch for all products:\n' + missingSelections.join('\n'));
+        return;
+    }
+    
+    if (confirm('Are you sure you want to approve this order with the selected branch assignments?')) {
+        // Disable submit button
+        const submitBtn = document.getElementById('approveBtn');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Approving...';
+        
+        fetch(`/orders/{{ order.id }}/approve`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                item_branch_selections: itemBranchSelections
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                window.location.href = `/orders/{{ order.id }}`;
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while approving the order.');
+        })
+        .finally(() => {
+            // Reset button state
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        });
+    }
+});
+
+// Auto-select first available branch for each item if none selected
+document.addEventListener('DOMContentLoaded', function() {
+    {% for item_data in order_items_with_branches %}
+    const itemRadios_{{ item_data.item.id }} = document.querySelectorAll('input[name="item_{{ item_data.item.id }}"]');
+    const hasSelection_{{ item_data.item.id }} = Array.from(itemRadios_{{ item_data.item.id }}).some(radio => radio.checked);
+    
+    if (!hasSelection_{{ item_data.item.id }}) {
+        // Find first available branch
+        const firstAvailable_{{ item_data.item.id }} = Array.from(itemRadios_{{ item_data.item.id }}).find(radio => radio.dataset.sufficient === 'true');
+        if (firstAvailable_{{ item_data.item.id }}) {
+            firstAvailable_{{ item_data.item.id }}.checked = true;
+        }
+    }
+    {% endfor %}
+});
+</script>
+{% endblock %} 

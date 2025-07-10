@@ -88,12 +88,12 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between mb-3">
                         <span class="text-muted">Previous Balance:</span>
-                        <span class="text-warning fw-bold">₵{{ "%.2f"|format(receipt.previous_balance) }}</span>
+                        <span class="text-warning fw-bold">KSh{{ "%.2f"|format(receipt.previous_balance) }}</span>
                     </div>
                     
                     <div class="d-flex justify-content-between mb-3">
                         <span class="text-muted">Payment Amount:</span>
-                        <span class="text-success fw-bold">-₵{{ "%.2f"|format(receipt.payment_amount) }}</span>
+                        <span class="text-success fw-bold">-KSh{{ "%.2f"|format(receipt.payment_amount) }}</span>
                     </div>
                     
                     <hr>
@@ -101,14 +101,14 @@
                     <div class="d-flex justify-content-between mb-3">
                         <h5 class="mb-0">Remaining Balance:</h5>
                         <h5 class="mb-0 {% if receipt.remaining_balance > 0 %}text-danger{% else %}text-success{% endif %}">
-                            ₵{{ "%.2f"|format(receipt.remaining_balance) }}
+                            KSh{{ "%.2f"|format(receipt.remaining_balance) }}
                         </h5>
                     </div>
 
                     {% if receipt.remaining_balance > 0 %}
                     <div class="alert alert-warning">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <strong>Outstanding Balance:</strong> ₵{{ "%.2f"|format(receipt.remaining_balance) }}
+                        <strong>Outstanding Balance:</strong> KSh{{ "%.2f"|format(receipt.remaining_balance) }}
                     </div>
                     {% else %}
                     <div class="alert alert-success">

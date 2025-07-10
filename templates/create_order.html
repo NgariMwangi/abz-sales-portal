@@ -14,15 +14,7 @@
                     <h5 class="mb-0">Order Information</h5>
                 </div>
                 <div class="card-body">
-                    <div class="mb-3">
-                        <label for="order_type_id" class="form-label">Order Type</label>
-                        <select class="form-select" id="order_type_id" name="order_type_id" required>
-                            <option value="">Select Order Type</option>
-                            {% for order_type in order_types %}
-                            <option value="{{ order_type.id }}">{{ order_type.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                    <input type="hidden" id="order_type_id" name="order_type_id" value="{{ walk_in_order_type_id }}">
                     <div class="mb-3">
                         <label for="branch_id" class="form-label">Branch</label>
                         <select class="form-select" id="branch_id" name="branch_id" required>
@@ -76,7 +68,7 @@
                 <p class="text-muted">No items added yet.</p>
             </div>
             <div class="d-flex justify-content-between align-items-center mt-3">
-                <h4>Total: $<span id="totalAmount">0.00</span></h4>
+                <h4>Total: KSh<span id="totalAmount">0.00</span></h4>
                 <button type="submit" class="btn btn-success" id="createOrderBtn" disabled>Create Order</button>
             </div>
         </div>
@@ -126,7 +118,7 @@ function updateProductSelect() {
     products.forEach(product => {
         const option = document.createElement('option');
         option.value = product.id;
-        option.textContent = `${product.name} - $${product.selling_price} (Stock: ${product.stock})`;
+        option.textContent = `${product.name} - KSh${product.selling_price} (Stock: ${product.stock})`;
         select.appendChild(option);
     });
 }
@@ -181,7 +173,9 @@ function addProduct() {
             product_id: parseInt(productId),
             product_name: product.name,
             quantity: quantity,
-            price: product.selling_price
+            price: product.selling_price,
+            negotiated_price: null,
+            negotiation_notes: null
         });
     }
     
@@ -213,8 +207,11 @@ function updateOrderItemsDisplay() {
                 <tr>
                     <th>Product</th>
                     <th>Quantity</th>
-                    <th>Price</th>
+                    <th>Original Price</th>
+                    <th>Negotiated Price</th>
+                    <th>Final Price</th>
                     <th>Total</th>
+                    <th>Notes</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -222,13 +219,30 @@ function updateOrderItemsDisplay() {
     `;
     
     orderItems.forEach((item, index) => {
-        const total = item.quantity * item.price;
+        const finalPrice = item.negotiated_price || item.price;
+        const total = item.quantity * finalPrice;
         html += `
             <tr>
                 <td>${item.product_name}</td>
                 <td>${item.quantity}</td>
-                <td>$${item.price.toFixed(2)}</td>
-                <td>$${total.toFixed(2)}</td>
+                <td>KSh${item.price.toFixed(2)}</td>
+                <td>
+                    <input type="number" 
+                           class="form-control form-control-sm negotiated-price" 
+                           value="${item.negotiated_price || item.price}" 
+                           step="0.01" 
+                           min="0"
+                           onchange="updateNegotiatedPrice(${index}, this.value)">
+                </td>
+                <td class="final-price">KSh${finalPrice.toFixed(2)}</td>
+                <td class="item-total">KSh${total.toFixed(2)}</td>
+                <td>
+                    <input type="text" 
+                           class="form-control form-control-sm" 
+                           placeholder="Notes..."
+                           value="${item.negotiation_notes || ''}"
+                           onchange="updateNegotiationNotes(${index}, this.value)">
+                </td>
                 <td>
                     <button type="button" class="btn btn-danger btn-sm" onclick="removeProduct(${index})">
                         Remove
@@ -242,8 +256,25 @@ function updateOrderItemsDisplay() {
     container.innerHTML = html;
 }
 
+function updateNegotiatedPrice(index, newPrice) {
+    const item = orderItems[index];
+    const originalPrice = item.price;
+    const negotiatedPrice = parseFloat(newPrice) || originalPrice;
+    
+    item.negotiated_price = negotiatedPrice !== originalPrice ? negotiatedPrice : null;
+    updateOrderItemsDisplay();
+    updateTotal();
+}
+
+function updateNegotiationNotes(index, notes) {
+    orderItems[index].negotiation_notes = notes.trim() || null;
+}
+
 function updateTotal() {
-    const total = orderItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+    const total = orderItems.reduce((sum, item) => {
+        const finalPrice = item.negotiated_price || item.price;
+        return sum + (item.quantity * finalPrice);
+    }, 0);
     document.getElementById('totalAmount').textContent = total.toFixed(2);
     document.getElementById('orderItemsData').value = JSON.stringify(orderItems);
     document.getElementById('createOrderBtn').disabled = orderItems.length === 0;

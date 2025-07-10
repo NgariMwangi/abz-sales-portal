@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% block title %}Delivery Payment #{{ payment.id }} - ABZ Hardware{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Delivery Payment #{{ payment.id }}</h2>
+    <div>
+        <a href="{{ url_for('delivery_payments_page') }}" class="btn btn-secondary me-2">
+            <i class="bi bi-arrow-left me-1"></i>Back to Payments
+        </a>
+        {% if payment.payment_status == 'completed' %}
+            <button class="btn btn-warning" onclick="refundPayment({{ payment.id }})">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Refund Payment
+            </button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <!-- Payment Information -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-credit-card me-2"></i>Payment Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-sm-6">
+                        <p><strong>Payment ID:</strong> #{{ payment.id }}</p>
+                        <p><strong>Amount:</strong> KSh {{ "%.2f"|format(payment.amount) }}</p>
+                        <p><strong>Payment Method:</strong> {{ payment.payment_method.replace('_', ' ').title() }}</p>
+                        <p><strong>Transaction ID:</strong> {{ payment.transaction_id or 'Not provided' }}</p>
+                    </div>
+                    <div class="col-sm-6">
+                        <p><strong>Status:</strong> 
+                            <span class="badge 
+                                {% if payment.payment_status == 'completed' %}bg-success
+                                {% elif payment.payment_status == 'failed' %}bg-danger
+                                {% elif payment.payment_status == 'refunded' %}bg-warning
+                                {% else %}bg-secondary{% endif %}">
+                                {{ payment.payment_status.title() }}
+                            </span>
+                        </p>
+                        <p><strong>Reference Number:</strong> {{ payment.reference_number or 'Not provided' }}</p>
+                        <p><strong>Payment Date:</strong> {{ payment.payment_date.strftime('%Y-%m-%d %H:%M') if payment.payment_date else 'Not set' }}</p>
+                        <p><strong>Created:</strong> {{ payment.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                    </div>
+                </div>
+                
+                {% if payment.notes %}
+                <div class="mt-3">
+                    <p><strong>Notes:</strong></p>
+                    <p class="text-muted">{{ payment.notes }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Delivery Information -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-truck me-2"></i>Delivery Information</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Delivery ID:</strong> 
+                    <a href="{{ url_for('delivery_detail', delivery_id=payment.delivery.id) }}">#{{ payment.delivery.id }}</a>
+                </p>
+                <p><strong>Order ID:</strong> 
+                    <a href="{{ url_for('order_detail', order_id=payment.delivery.order_id) }}">#{{ payment.delivery.order_id }}</a>
+                </p>
+                <p><strong>Customer:</strong> {{ payment.delivery.order.user.firstname }} {{ payment.delivery.order.user.lastname }}</p>
+                <p><strong>Customer Phone:</strong> {{ payment.delivery.customer_phone }}</p>
+                <p><strong>Delivery Location:</strong> {{ payment.delivery.delivery_location }}</p>
+                <p><strong>Delivery Status:</strong> 
+                    <span class="badge 
+                        {% if payment.delivery.delivery_status == 'delivered' %}bg-success
+                        {% elif payment.delivery.delivery_status == 'in_transit' %}bg-info
+                        {% elif payment.delivery.delivery_status == 'cancelled' %}bg-danger
+                        {% else %}bg-warning{% endif %}">
+                        {{ payment.delivery.delivery_status.replace('_', ' ').title() }}
+                    </span>
+                </p>
+                <p><strong>Delivery Amount:</strong> KSh {{ "%.2f"|format(payment.delivery.delivery_amount) }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Order Information -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-cart me-2"></i>Order Information</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Order Type:</strong> {{ payment.delivery.order.ordertype.name }}</p>
+                <p><strong>Branch:</strong> {{ payment.delivery.order.branch.name }}</p>
+                <p><strong>Order Status:</strong> 
+                    <span class="badge {% if payment.delivery.order.approvalstatus %}bg-success{% else %}bg-warning{% endif %}">
+                        {% if payment.delivery.order.approvalstatus %}Approved{% else %}Pending{% endif %}
+                    </span>
+                </p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Order Created:</strong> {{ payment.delivery.order.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                <p><strong>Agreed Delivery Time:</strong> 
+                    {{ payment.delivery.agreed_delivery_time.strftime('%Y-%m-%d %H:%M') if payment.delivery.agreed_delivery_time else 'Not set' }}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment History -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Payment History</h5>
+    </div>
+    <div class="card-body">
+        <div class="timeline">
+            <div class="timeline-item">
+                <div class="timeline-marker bg-primary"></div>
+                <div class="timeline-content">
+                    <h6>Payment Created</h6>
+                    <p class="text-muted">{{ payment.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                    <p>Payment of KSh {{ "%.2f"|format(payment.amount) }} was created for delivery #{{ payment.delivery.id }}</p>
+                </div>
+            </div>
+            
+            {% if payment.payment_date %}
+            <div class="timeline-item">
+                <div class="timeline-marker bg-success"></div>
+                <div class="timeline-content">
+                    <h6>Payment Completed</h6>
+                    <p class="text-muted">{{ payment.payment_date.strftime('%Y-%m-%d %H:%M') }}</p>
+                    <p>Payment was successfully processed via {{ payment.payment_method.replace('_', ' ').title() }}</p>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if payment.payment_status == 'refunded' %}
+            <div class="timeline-item">
+                <div class="timeline-marker bg-warning"></div>
+                <div class="timeline-content">
+                    <h6>Payment Refunded</h6>
+                    <p class="text-muted">{{ payment.updated_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                    <p>Payment was refunded{% if payment.notes %}: {{ payment.notes }}{% endif %}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block head %}
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -35px;
+    top: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 3px #dee2e6;
+}
+
+.timeline-content {
+    padding-left: 20px;
+}
+
+.timeline-content h6 {
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.timeline-content p {
+    margin-bottom: 5px;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function refundPayment(paymentId) {
+    const reason = prompt('Please enter a reason for the refund:');
+    if (reason !== null) {
+        fetch(`/delivery-payments/${paymentId}/refund`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ refund_reason: reason })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', data.message);
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showAlert('danger', 'Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', 'An error occurred while refunding the payment.');
+        });
+    }
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show mt-3`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    document.querySelector('.container-fluid').insertBefore(alertDiv, document.querySelector('.container-fluid').firstChild);
+}
+</script>
+{% endblock %} 
