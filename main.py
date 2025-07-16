@@ -283,22 +283,49 @@ def orders_page():
         elif status == 'approved':
             query = query.filter_by(approvalstatus=True)
         
-        # For non-admin users, show only their orders
+        # For non-admin users, show all online orders + their own walk-in orders
         if current_user.role != 'admin':
-            query = query.filter(Order.userid == current_user.id)
-        
-        # Debug: Print query info
-        print(f"DEBUG: User role = {current_user.role}")
-        print(f"DEBUG: User ID = {current_user.id}")
-        
-        orders = query.order_by(Order.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
-        orders_list = orders.items
-        total = orders.total
-        pages = orders.pages
-        
-        # Debug: Print counts
-        print(f"DEBUG: Total orders found = {total}")
-        print(f"DEBUG: Orders on current page = {len(orders_list)}")
+            # Get all online orders
+            online_orders = query.join(OrderType).filter(
+                OrderType.name.ilike('%online%')
+            ).all()
+            
+            # Get walk-in orders created by current user
+            walk_in_orders = query.join(OrderType).filter(
+                OrderType.name.ilike('%walk%'),
+                Order.userid == current_user.id
+            ).all()
+            
+            # Combine and sort
+            combined_orders = online_orders + walk_in_orders
+            combined_orders = list({o.id: o for o in combined_orders}.values())  # Remove duplicates
+            combined_orders.sort(key=lambda o: o.created_at, reverse=True)
+            
+            # Manual pagination
+            total = len(combined_orders)
+            pages = (total + per_page - 1) // per_page
+            start = (page - 1) * per_page
+            end = start + per_page
+            orders_list = combined_orders[start:end]
+            
+            # Debug: Print counts
+            print(f"DEBUG: User role = {current_user.role}")
+            print(f"DEBUG: User ID = {current_user.id}")
+            print(f"DEBUG: online_orders count = {len(online_orders)}")
+            print(f"DEBUG: walk_in_orders count = {len(walk_in_orders)}")
+            print(f"DEBUG: Total orders found = {total}")
+            print(f"DEBUG: Orders on current page = {len(orders_list)}")
+        else:
+            # For admin users, show all orders
+            orders = query.order_by(Order.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+            orders_list = orders.items
+            total = orders.total
+            pages = orders.pages
+            
+            # Debug: Print counts
+            print(f"DEBUG: User role = {current_user.role}")
+            print(f"DEBUG: Total orders found = {total}")
+            print(f"DEBUG: Orders on current page = {len(orders_list)}")
         
         class Pagination:
             def __init__(self, items, page, per_page, total, pages):
