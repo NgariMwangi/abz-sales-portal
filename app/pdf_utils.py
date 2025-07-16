@@ -107,7 +107,7 @@ def generate_invoice_pdf(invoice_id):
     
     # Customer information
     # Check if it's a walk-in order
-    if order.ordertype.name.lower() == 'walk-in':
+    if 'walk' in order.ordertype.name.lower():
         story.append(Paragraph("Served by:", subtitle_style))
         story.append(Paragraph(f"{user.firstname} {user.lastname}", normal_style))
     else:

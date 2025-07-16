@@ -262,11 +262,11 @@ def orders_page():
         elif status == 'approved':
             query = query.filter_by(approvalstatus=True)
         
-        # Then join with OrderType and filter by order type
-        query = query.join(OrderType).filter(OrderType.name == order_type)
+        # Then join with OrderType and filter by order type (case-insensitive)
+        query = query.join(OrderType).filter(OrderType.name.ilike(order_type))
         
         # For walk-in orders, only show orders created by current user
-        if order_type.lower() == 'walk-in':
+        if order_type.lower() in ['walk-in', 'walkin', 'walk in']:
             query = query.filter(Order.userid == current_user.id)
         
         orders = query.order_by(Order.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
@@ -274,43 +274,32 @@ def orders_page():
         total = orders.total
         pages = orders.pages
     else:
-        # No filter: show all online orders + current user's walk-in orders
-        # Create separate queries for online and walk-in orders
-        online_query = Order.query
-        walk_in_query = Order.query
+        # No filter: show all orders for current user or all orders for admin
+        query = Order.query
         
-        # Apply status filters to both queries
+        # Apply status filters
         if status == 'pending':
-            online_query = online_query.filter_by(approvalstatus=False)
-            walk_in_query = walk_in_query.filter_by(approvalstatus=False)
+            query = query.filter_by(approvalstatus=False)
         elif status == 'approved':
-            online_query = online_query.filter_by(approvalstatus=True)
-            walk_in_query = walk_in_query.filter_by(approvalstatus=True)
+            query = query.filter_by(approvalstatus=True)
         
-        # Get online orders
-        online_orders = online_query.join(OrderType).filter(OrderType.name == 'online').all()
+        # For non-admin users, show only their orders
+        if current_user.role != 'admin':
+            query = query.filter(Order.userid == current_user.id)
         
-        # Get walk-in orders for current user
-        walk_in_orders = walk_in_query.join(OrderType).filter(
-            OrderType.name == 'walk-in', 
-            Order.userid == current_user.id
-        ).all()
+        # Debug: Print query info
+        print(f"DEBUG: User role = {current_user.role}")
+        print(f"DEBUG: User ID = {current_user.id}")
+        
+        orders = query.order_by(Order.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+        orders_list = orders.items
+        total = orders.total
+        pages = orders.pages
         
         # Debug: Print counts
-        print(f"DEBUG: online_orders count = {len(online_orders)}")
-        print(f"DEBUG: walk_in_orders count = {len(walk_in_orders)}")
+        print(f"DEBUG: Total orders found = {total}")
+        print(f"DEBUG: Orders on current page = {len(orders_list)}")
         
-        combined_orders = online_orders + walk_in_orders
-        # Remove duplicates (in case of any overlap)
-        combined_orders = list({o.id: o for o in combined_orders}.values())
-        # Sort by created_at desc
-        combined_orders.sort(key=lambda o: o.created_at, reverse=True)
-        # Manual pagination
-        total = len(combined_orders)
-        pages = (total + per_page - 1) // per_page
-        start = (page - 1) * per_page
-        end = start + per_page
-        orders_list = combined_orders[start:end]
         class Pagination:
             def __init__(self, items, page, per_page, total, pages):
                 self.items = items
@@ -392,7 +381,7 @@ def order_detail(order_id):
         
         # For online orders, get the fulfillment branch information from stock transactions
         fulfillment_branch = None
-        if order.ordertype.name.lower() == 'online' and order.approvalstatus:
+        if 'online' in order.ordertype.name.lower() and order.approvalstatus:
             # Find the stock transaction for this item to see which branch was used
             stock_transaction = StockTransaction.query.filter(
                 StockTransaction.notes.like(f'Order #{order.id} approved%'),
@@ -444,7 +433,7 @@ def select_fulfillment_branch(order_id):
     order = Order.query.get_or_404(order_id)
     
     # Only allow branch selection for online orders that are not yet approved
-    if order.ordertype.name.lower() != 'online' or order.approvalstatus:
+    if 'online' not in order.ordertype.name.lower() or order.approvalstatus:
         flash('Branch selection is only available for pending online orders', 'warning')
         return redirect(url_for('order_detail', order_id=order_id))
     
@@ -584,8 +573,8 @@ def create_order():
             return redirect(url_for('create_order'))
     
     # GET request - show form
-    # Get walk-in order type ID
-    walk_in_order_type = OrderType.query.filter_by(name='Walk-in').first()
+    # Get walk-in order type ID (case-insensitive)
+    walk_in_order_type = OrderType.query.filter(OrderType.name.ilike('%walk%')).first()
     if not walk_in_order_type:
         flash('Walk-in order type not found. Please contact administrator.', 'danger')
         return redirect(url_for('orders_page'))

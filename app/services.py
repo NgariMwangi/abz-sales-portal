@@ -19,7 +19,7 @@ class OrderService:
             order.approved_at = datetime.utcnow()
             
             # For online orders, require branch selections for each item
-            if order.ordertype.name.lower() == 'online':
+            if 'online' in order.ordertype.name.lower():
                 if not item_branch_selections:
                     return False, 'Branch selections are required for online orders'
                 
@@ -30,7 +30,7 @@ class OrderService:
             
             # Update stock for each item
             for item in order.order_items:
-                if order.ordertype.name.lower() == 'online' and item_branch_selections:
+                if 'online' in order.ordertype.name.lower() and item_branch_selections:
                     # For online orders, reduce stock from the selected branch for this item
                     selected_branch_id = item_branch_selections.get(str(item.id))
                     if not selected_branch_id:
@@ -149,7 +149,7 @@ class OrderService:
             
             # Get order type to determine if it's walk-in
             order_type = OrderType.query.get(order.ordertypeid)
-            is_walk_in = order_type.name.lower() == 'walk-in'
+            is_walk_in = 'walk' in order_type.name.lower()
             
             # Add order items
             total_amount = 0
