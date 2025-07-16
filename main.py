@@ -1480,7 +1480,14 @@ def create_delivery():
             notes = data.get('notes', '')
 
             # Get available orders for dropdown (use 'userid' instead of 'user_id')
-            available_orders = Order.query.filter_by(userid=current_user.id).all()
+            available_orders = Order.query.filter_by(approvalstatus=True).all()
+            
+            # Filter out orders that already have deliveries
+            orders_without_deliveries = []
+            for order in available_orders:
+                existing_delivery = Delivery.query.filter_by(order_id=order.id).first()
+                if not existing_delivery:
+                    orders_without_deliveries.append(order)
 
             # Build form dict from submitted data
             form = {
@@ -1500,7 +1507,7 @@ def create_delivery():
                 return render_template('create_delivery.html',
                                       user=current_user,
                                       order=None,
-                                      available_orders=available_orders,
+                                      available_orders=orders_without_deliveries,
                                       form=form,
                                       selected_order_id=order_id)
 
@@ -1513,7 +1520,7 @@ def create_delivery():
                 return render_template('create_delivery.html',
                                       user=current_user,
                                       order=None,
-                                      available_orders=available_orders,
+                                      available_orders=orders_without_deliveries,
                                       form=form,
                                       selected_order_id=order_id)
 
@@ -1551,7 +1558,14 @@ def create_delivery():
         except Exception as e:
             db.session.rollback()
             # Get available orders for dropdown (use 'userid' instead of 'user_id')
-            available_orders = Order.query.filter_by(userid=current_user.id).all()
+            available_orders = Order.query.filter_by(approvalstatus=True).all()
+            
+            # Filter out orders that already have deliveries
+            orders_without_deliveries = []
+            for order in available_orders:
+                existing_delivery = Delivery.query.filter_by(order_id=order.id).first()
+                if not existing_delivery:
+                    orders_without_deliveries.append(order)
             # Build form dict from submitted data
             form = {
                 'delivery_amount': request.form.get('delivery_amount', ''),
@@ -1567,7 +1581,7 @@ def create_delivery():
             return render_template('create_delivery.html',
                                   user=current_user,
                                   order=None,
-                                  available_orders=available_orders,
+                                  available_orders=orders_without_deliveries,
                                   form=form,
                                   selected_order_id=request.form.get('order_id'))
 
@@ -1577,8 +1591,15 @@ def create_delivery():
     if order_id:
         order = Order.query.get(order_id)
 
-    # Get available orders for dropdown (use 'userid' instead of 'user_id')
-    available_orders = Order.query.filter_by(userid=current_user.id).all()
+    # Get available orders for delivery - show all approved orders that don't have deliveries yet
+    available_orders = Order.query.filter_by(approvalstatus=True).all()
+    
+    # Filter out orders that already have deliveries
+    orders_without_deliveries = []
+    for order in available_orders:
+        existing_delivery = Delivery.query.filter_by(order_id=order.id).first()
+        if not existing_delivery:
+            orders_without_deliveries.append(order)
 
     # Initialize form data
     form = {
@@ -1593,7 +1614,7 @@ def create_delivery():
     return render_template('create_delivery.html',
                          user=current_user,
                          order=order,
-                         available_orders=available_orders,
+                         available_orders=orders_without_deliveries,
                          form=form,
                          selected_order_id=order_id)
 
