@@ -4,11 +4,34 @@
 
 {% block content %}
 <div class="container-fluid">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" 
+         style="background: rgba(0,0,0,0.5); z-index: 9999;">
+        <div class="d-flex justify-content-center align-items-center h-100">
+            <div class="text-center text-white">
+                <div class="spinner-border mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5>Processing Payment...</h5>
+                <p class="mb-0">Please wait while we process your payment</p>
+                <div class="mt-3">
+                    <div class="progress" style="height: 6px;">
+                        <div id="paymentProgress" class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <small id="progressText" class="d-block mt-2">Initializing payment...</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0">Process Payment</h1>
+        <h1 class="h3 mb-0">Process Payment - Order #{{ order.id }}</h1>
+        <div class="d-flex gap-2">
         <a href="{{ url_for('order_detail', order_id=order.id) }}" class="btn btn-outline-secondary">
             <i class="fas fa-arrow-left"></i> Back to Order
         </a>
+        </div>
     </div>
 
     <div class="row">
@@ -67,17 +90,17 @@
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div>
                             <strong>{{ item.product.name }}</strong><br>
-                            <small class="text-muted">Qty: {{ item.quantity }} × ₵{{ item.product.sellingprice }}</small>
+                            <small class="text-muted">Qty: {{ item.quantity }} × KSh{{ item.product.sellingprice }}</small>
                         </div>
                         <div class="text-end">
-                            <strong>₵{{ "%.2f"|format(item.quantity * item.product.sellingprice) }}</strong>
+                            <strong>KSh{{ "%.2f"|format(item.quantity * item.product.sellingprice) }}</strong>
                         </div>
                     </div>
                     {% endfor %}
                     <hr>
                     <div class="d-flex justify-content-between align-items-center">
                         <h6 class="mb-0">Total Amount:</h6>
-                        <h5 class="mb-0 text-success">₵{{ "%.2f"|format(total_amount) }}</h5>
+                        <h5 class="mb-0 text-success">KSh{{ "%.2f"|format(total_amount) }}</h5>
                     </div>
                 </div>
             </div>
@@ -95,7 +118,7 @@
                             <div class="col-md-6 mb-3">
                                 <label for="amount" class="form-label">Amount *</label>
                                 <div class="input-group">
-                                    <span class="input-group-text">₵</span>
+                                    <span class="input-group-text">KSh</span>
                                     <input type="number" class="form-control" id="amount" name="amount" 
                                            value="{{ "%.2f"|format(total_amount) }}" step="0.01" required>
                                 </div>
@@ -137,6 +160,12 @@
                             <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
                                 <i class="fas fa-undo"></i> Reset
                             </button>
+                            <button type="button" class="btn btn-outline-info" onclick="testForm()">
+                                <i class="fas fa-bug"></i> Test Form
+                            </button>
+                            <button type="button" class="btn btn-outline-warning" onclick="simplePayment()">
+                                <i class="fas fa-bolt"></i> Simple Payment
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -164,7 +193,7 @@
                                 {% for payment in payment_history %}
                                 <tr>
                                     <td>{{ payment.payment_date.strftime('%Y-%m-%d %H:%M') if payment.payment_date else payment.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                                    <td>₵{{ "%.2f"|format(payment.amount) }}</td>
+                                    <td>KSh{{ "%.2f"|format(payment.amount) }}</td>
                                     <td>
                                         <span class="badge bg-info">{{ payment.payment_method|title }}</span>
                                     </td>
@@ -197,6 +226,121 @@
 
 {% block scripts %}
 <script>
+// Toast notification function
+function showToast(type, message) {
+    // Create toast container if it doesn't exist
+    let toastContainer = document.getElementById('toastContainer');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toastContainer';
+        toastContainer.className = 'position-fixed top-0 end-0 p-3';
+        toastContainer.style.zIndex = '9999';
+        document.body.appendChild(toastContainer);
+    }
+    
+    // Create toast element
+    const toast = document.createElement('div');
+    const bgClass = type === 'error' ? 'bg-danger' : type === 'success' ? 'bg-success' : type === 'warning' ? 'bg-warning' : 'bg-info';
+    toast.className = `toast align-items-center text-white ${bgClass} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="this.parentElement.parentElement.remove()" aria-label="Close"></button>
+        </div>
+    `;
+    
+    // Add to container
+    toastContainer.appendChild(toast);
+    
+    // Show toast with fallback
+    try {
+        const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
+        bsToast.show();
+        
+        // Remove toast after it's hidden
+        toast.addEventListener('hidden.bs.toast', () => {
+            toast.remove();
+        });
+    } catch (e) {
+        // Fallback if Bootstrap is not available
+        toast.style.display = 'block';
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+    }
+}
+
+function simplePayment() {
+    console.log('Simple payment test...');
+    const formData = new FormData(document.getElementById('paymentForm'));
+    const data = {
+        amount: parseFloat(formData.get('amount')),
+        payment_method: formData.get('payment_method'),
+        transaction_id: formData.get('transaction_id'),
+        notes: formData.get('notes')
+    };
+    
+    console.log('Simple payment data:', data);
+    
+    // Simple fetch without complex loading
+    fetch(`/orders/{{ order.id }}/payment`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => {
+        console.log('Simple payment response:', response);
+        return response.json();
+    })
+    .then(data => {
+        console.log('Simple payment result:', data);
+        if (data.success) {
+            alert(`Payment successful! Reference: ${data.reference_number}`);
+            window.location.href = `/orders/{{ order.id }}`;
+        } else {
+            alert(`Payment failed: ${data.message}`);
+        }
+    })
+    .catch(error => {
+        console.error('Simple payment error:', error);
+        alert('Payment error: ' + error.message);
+    });
+}
+
+function testForm() {
+    console.log('Testing form...');
+    const formData = new FormData(document.getElementById('paymentForm'));
+    const data = {
+        amount: parseFloat(formData.get('amount')),
+        payment_method: formData.get('payment_method'),
+        transaction_id: formData.get('transaction_id'),
+        notes: formData.get('notes')
+    };
+    console.log('Form data:', data);
+    showToast('info', 'Form test - check console for data');
+}
+
+// Simple test to see if the form is working
+console.log('Payment form script loaded');
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, payment form ready');
+    const form = document.getElementById('paymentForm');
+    if (form) {
+        console.log('Payment form found');
+    } else {
+        console.error('Payment form not found!');
+    }
+});
+
 document.getElementById('paymentForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -219,40 +363,156 @@ document.getElementById('paymentForm').addEventListener('submit', function(e) {
         return;
     }
     
-    // Disable submit button
+    // Disable submit button and show loading state
     const submitBtn = this.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing Payment...';
     
-    fetch(`/orders/{{ order.id }}/payment`, {
+    // Show loading overlay
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const progressBar = document.getElementById('paymentProgress');
+    const progressText = document.getElementById('progressText');
+    loadingOverlay.classList.remove('d-none');
+    
+    // Progress tracking
+    let progress = 0;
+    const updateProgress = (percent, text) => {
+        progress = percent;
+        progressBar.style.width = percent + '%';
+        progressText.textContent = text;
+    };
+    
+    updateProgress(10, 'Validating payment data...');
+    
+    // Show immediate feedback
+    showToast('info', 'Processing payment... Please wait.');
+    
+    // Simulate progress updates
+    const progressInterval = setInterval(() => {
+        if (progress < 90) {
+            progress += 10;
+            updateProgress(progress, 'Processing payment...');
+        }
+    }, 500);
+    
+    // Add a timeout to prevent hanging
+    const timeoutId = setTimeout(() => {
+        showToast('warning', 'Payment is taking longer than expected. Please wait...');
+        updateProgress(95, 'Finalizing payment...');
+    }, 3000);
+    
+    // Try quick payment first, fallback to regular payment
+    const tryQuickPayment = () => {
+        return fetch(`/orders/{{ order.id }}/payment/quick`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(data)
+        });
+    };
+    
+    const tryRegularPayment = () => {
+        return fetch(`/orders/{{ order.id }}/payment`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'
         },
         body: JSON.stringify(data)
+        });
+    };
+    
+    // Try quick payment first
+    tryQuickPayment()
+    .then(response => {
+        clearTimeout(timeoutId);
+        clearInterval(progressInterval);
+        updateProgress(95, 'Finalizing payment...');
+        
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
     })
-    .then(response => response.json())
+    .catch(error => {
+        console.log('Quick payment failed, trying regular payment:', error);
+        // Fallback to regular payment
+        return tryRegularPayment().then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        });
+    })
     .then(data => {
+        console.log('Response data:', data);
+        updateProgress(100, 'Payment completed successfully!');
+        
         if (data.success) {
-            showToast('success', data.message);
+            showToast('success', `Payment processed successfully! Reference: ${data.reference_number}`);
+            
+            // Update payment history table immediately
+            updatePaymentHistory(data);
+            
+            // Complete background tasks (receipt generation and email)
+            fetch(`/orders/{{ order.id }}/payment/${data.payment_id}/complete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }).catch(error => {
+                console.log('Background tasks completed with warning:', error);
+            });
+            
+            // Hide loading overlay after a short delay
+            setTimeout(() => {
+                loadingOverlay.classList.add('d-none');
+            }, 1000);
+            
+            // Redirect after a short delay
             setTimeout(() => {
                 window.location.href = `/orders/{{ order.id }}`;
-            }, 1500);
+            }, 2000);
         } else {
-            showToast('error', data.message);
+            showToast('error', data.message || 'Payment failed');
+            loadingOverlay.classList.add('d-none');
         }
     })
     .catch(error => {
-        showToast('error', 'Error processing payment');
-        console.error('Error:', error);
+        clearTimeout(timeoutId);
+        clearInterval(progressInterval);
+        console.error('Fetch error:', error);
+        showToast('error', 'Error processing payment. Please try again.');
+        loadingOverlay.classList.add('d-none');
     })
     .finally(() => {
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
     });
 });
+
+function updatePaymentHistory(paymentData) {
+    // Add new payment to the payment history table if it exists
+    const paymentHistoryTable = document.querySelector('table tbody');
+    if (paymentHistoryTable) {
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>${new Date().toLocaleString()}</td>
+            <td>KSh${paymentData.amount?.toFixed(2) || '0.00'}</td>
+            <td><span class="badge bg-info">${paymentData.payment_method || 'Unknown'}</span></td>
+            <td><span class="badge bg-success">Completed</span></td>
+            <td><small class="text-muted">${paymentData.reference_number || ''}</small></td>
+        `;
+        paymentHistoryTable.insertBefore(newRow, paymentHistoryTable.firstChild);
+    }
+}
 
 function resetForm() {
     document.getElementById('paymentForm').reset();

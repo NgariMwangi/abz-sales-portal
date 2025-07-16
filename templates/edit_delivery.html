@@ -131,7 +131,7 @@
             <div class="card-body">
                 <p><strong>Order Type:</strong> {{ delivery.order.order_type }}</p>
                 <p><strong>Branch:</strong> {{ delivery.order.branch }}</p>
-                <p><strong>Order Total:</strong> KSh {{ "%.2f"|format(delivery.order.total_amount) }}</p>
+                <p><strong>Order Total:</strong> KSh{{ "%.2f"|format(delivery.order.total_amount) }}</p>
                 <p><strong>Order Status:</strong> 
                     <span class="badge {% if delivery.order.status == 'Approved' %}bg-success{% else %}bg-warning{% endif %}">
                         {{ delivery.order.status }}

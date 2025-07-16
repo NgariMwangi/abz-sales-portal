@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Quotation {{ quotation.quotation_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>Quotation {{ quotation.quotation_number }}</h2>
+            <p class="text-muted mb-0">Created on {{ quotation.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+        </div>
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('view_quotation_pdf', quotation_id=quotation.id) }}" 
+               class="btn btn-info" target="_blank">
+                <i class="fas fa-eye"></i> View PDF
+            </a>
+            <a href="{{ url_for('download_quotation_pdf', quotation_id=quotation.id) }}" 
+               class="btn btn-secondary">
+                <i class="fas fa-download"></i> Download PDF
+            </a>
+            <a href="{{ url_for('quotations_page') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to List
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Quotation Details -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Quotation Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Quotation Number:</strong></td>
+                                    <td>{{ quotation.quotation_number }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Customer Name:</strong></td>
+                                    <td>{{ quotation.customer_name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Customer Email:</strong></td>
+                                    <td>{{ quotation.customer_email or 'N/A' }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Customer Phone:</strong></td>
+                                    <td>{{ quotation.customer_phone or 'N/A' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Branch:</strong></td>
+                                    <td>{{ quotation.branch.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Status:</strong></td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if quotation.status == 'pending' %}bg-warning
+                                            {% elif quotation.status == 'accepted' %}bg-success
+                                            {% elif quotation.status == 'rejected' %}bg-danger
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ quotation.status.title() }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Valid Until:</strong></td>
+                                    <td>
+                                        {% if quotation.valid_until %}
+                                            {{ quotation.valid_until.strftime('%Y-%m-%d') }}
+                                        {% else %}
+                                            <span class="text-muted">No expiry</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Created By:</strong></td>
+                                    <td>{{ quotation.creator.firstname }} {{ quotation.creator.lastname }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+
+                    {% if quotation.notes %}
+                    <div class="mt-3">
+                        <h6>Notes:</h6>
+                        <p class="mb-0">{{ quotation.notes }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quotation Items -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Quotation Items</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Quantity</th>
+                                    <th>Unit Price</th>
+                                    <th>Total</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in quotation.items %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.product.name }}</strong>
+                                        {% if item.product.productcode %}
+                                        <br><small class="text-muted">Code: {{ item.product.productcode }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>KSh{{ "%.2f"|format(item.unit_price) }}</td>
+                                    <td>KSh{{ "%.2f"|format(item.total_price) }}</td>
+                                    <td>{{ item.notes or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-info">
+                                    <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                                    <td><strong>KSh{{ "%.2f"|format(quotation.total_amount) }}</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Management -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Status Management</h5>
+                </div>
+                <div class="card-body">
+                    <form id="statusForm">
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Update Status</label>
+                            <select class="form-select" id="status" name="status">
+                                <option value="pending" {% if quotation.status == 'pending' %}selected{% endif %}>Pending</option>
+                                <option value="accepted" {% if quotation.status == 'accepted' %}selected{% endif %}>Accepted</option>
+                                <option value="rejected" {% if quotation.status == 'rejected' %}selected{% endif %}>Rejected</option>
+                                <option value="expired" {% if quotation.status == 'expired' %}selected{% endif %}>Expired</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Update Status</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('create_quotation') }}" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Create New Quotation
+                        </a>
+                        <a href="{{ url_for('quotations_page') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-list"></i> View All Quotations
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('statusForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const status = document.getElementById('status').value;
+    
+    fetch('{{ url_for("update_quotation_status", quotation_id=quotation.id) }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            status: status
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Status updated successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while updating status.');
+    });
+});
+</script>
+{% endblock %} 

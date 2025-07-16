@@ -43,23 +43,34 @@ def generate_receipt_number():
 
 def create_invoice_for_order(order, total_amount):
     """Create an invoice for a given order"""
-    invoice_number = generate_invoice_number()
-    
-    invoice = Invoice(
-        orderid=order.id,
-        invoice_number=invoice_number,
-        total_amount=total_amount,
-        subtotal=total_amount,
-        tax_amount=0.00,  # Can be calculated based on business rules
-        discount_amount=0.00,  # Can be applied based on business rules
-        status='pending',
-        due_date=datetime.utcnow() + timedelta(days=30),  # 30 days from creation
-        notes=f'Invoice generated for Order #{order.id}'
-    )
-    
-    db.session.add(invoice)
-    db.session.commit()
-    return invoice
+    try:
+        print(f"Creating invoice for order {order.id} with total amount {total_amount}")
+        
+        invoice_number = generate_invoice_number()
+        print(f"Generated invoice number: {invoice_number}")
+        
+        invoice = Invoice(
+            orderid=order.id,
+            invoice_number=invoice_number,
+            total_amount=total_amount,
+            subtotal=total_amount,
+            tax_amount=0.00,  # Can be calculated based on business rules
+            discount_amount=0.00,  # Can be applied based on business rules
+            status='pending',
+            due_date=datetime.utcnow() + timedelta(days=30),  # 30 days from creation
+            notes=f'Invoice generated for Order #{order.id}'
+        )
+        
+        print(f"Created invoice object: {invoice.invoice_number}")
+        db.session.add(invoice)
+        db.session.commit()
+        print(f"Successfully saved invoice {invoice.invoice_number} to database")
+        
+        return invoice
+    except Exception as e:
+        print(f"Error creating invoice for order {order.id}: {str(e)}")
+        db.session.rollback()
+        raise e
 
 
 def create_receipt_for_payment(payment, previous_balance, remaining_balance):

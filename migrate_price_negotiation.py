@@ -72,7 +72,7 @@ def migrate_price_negotiation():
                 try:
                     # Get the product's selling price
                     product = Product.query.get(item.productid)
-                    if product and product.sellingprice:
+                    if product and product.sellingprice is not None:
                         original_price = float(product.sellingprice)
                         final_price = original_price
                         

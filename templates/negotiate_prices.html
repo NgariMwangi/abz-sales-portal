@@ -186,20 +186,13 @@ function saveNegotiations() {
         const originalPrice = parseFloat(priceInput.dataset.originalPrice);
         const negotiatedPrice = parseFloat(priceInput.value) || originalPrice;
         
-        // Only include if price has changed or notes exist
-        if (negotiatedPrice !== originalPrice || (notesInput.value && notesInput.value.trim())) {
-            negotiations.push({
-                order_item_id: priceInput.dataset.itemId,
-                new_price: negotiatedPrice,
-                notes: notesInput.value.trim()
-            });
-        }
+        // Include all items regardless of changes
+        negotiations.push({
+            order_item_id: priceInput.dataset.itemId,
+            new_price: negotiatedPrice,
+            notes: notesInput.value.trim()
+        });
     });
-    
-    if (negotiations.length === 0) {
-        alert('No changes detected. Please modify prices or add notes before saving.');
-        return;
-    }
     
     // Show loading state
     const submitBtn = document.querySelector('button[type="submit"]');

@@ -83,8 +83,20 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
+                    <a href="{{ url_for('create_invoice_for_order_manual', order_id=order.id) }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-plus"></i> Create Invoice (Debug)
+                    </a>
+                    <a href="{{ url_for('view_invoice_pdf', order_id=order.id) }}" class="btn btn-outline-primary btn-sm" target="_blank">
+                        <i class="fas fa-eye"></i> View Invoice PDF
+                    </a>
+                    <a href="{{ url_for('download_invoice_pdf', order_id=order.id) }}" class="btn btn-outline-success btn-sm">
+                        <i class="fas fa-download"></i> Download Invoice PDF
+                    </a>
+                    <a href="{{ url_for('send_invoice_email', order_id=order.id) }}" class="btn btn-outline-warning btn-sm">
+                        <i class="fas fa-envelope"></i> Send Invoice Email
+                    </a>
                     <a href="{{ url_for('invoices_page') }}?order_id={{ order.id }}" class="btn btn-outline-info btn-sm">
-                        <i class="fas fa-file-invoice"></i> View Invoice
+                        <i class="fas fa-file-invoice"></i> View Invoice Details
                     </a>
                     <a href="{{ url_for('receipts_page') }}?order_id={{ order.id }}" class="btn btn-outline-success btn-sm">
                         <i class="fas fa-receipt"></i> View Receipts

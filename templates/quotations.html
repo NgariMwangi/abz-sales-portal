@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Quotations{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Quotations</h2>
+        <a href="{{ url_for('create_quotation') }}" class="btn btn-success">
+            <i class="fas fa-plus"></i> Create Quotation
+        </a>
+    </div>
+
+    <!-- Search and Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" name="search" 
+                           placeholder="Search by customer name..." 
+                           value="{{ current_search }}">
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="status">
+                        <option value="">All Status</option>
+                        <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="accepted" {% if current_status == 'accepted' %}selected{% endif %}>Accepted</option>
+                        <option value="rejected" {% if current_status == 'rejected' %}selected{% endif %}>Rejected</option>
+                        <option value="expired" {% if current_status == 'expired' %}selected{% endif %}>Expired</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                </div>
+                <div class="col-md-2">
+                    <a href="{{ url_for('quotations_page') }}" class="btn btn-secondary w-100">Clear</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Quotations List -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Quotations List</h5>
+        </div>
+        <div class="card-body">
+            {% if quotations %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Quotation #</th>
+                            <th>Customer</th>
+                            <th>Branch</th>
+                            <th>Total Amount</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Valid Until</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for quotation in quotations %}
+                        <tr>
+                            <td>
+                                <strong>{{ quotation.quotation_number }}</strong>
+                            </td>
+                            <td>
+                                <div>{{ quotation.customer_name }}</div>
+                                {% if quotation.customer_email %}
+                                <small class="text-muted">{{ quotation.customer_email }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ quotation.branch.name }}</td>
+                            <td>KSh{{ "%.2f"|format(quotation.total_amount) }}</td>
+                            <td>
+                                <span class="badge 
+                                    {% if quotation.status == 'pending' %}bg-warning
+                                    {% elif quotation.status == 'accepted' %}bg-success
+                                    {% elif quotation.status == 'rejected' %}bg-danger
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ quotation.status.title() }}
+                                </span>
+                            </td>
+                            <td>{{ quotation.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                {% if quotation.valid_until %}
+                                    {{ quotation.valid_until.strftime('%Y-%m-%d') }}
+                                {% else %}
+                                    <span class="text-muted">No expiry</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{{ url_for('quotation_detail', quotation_id=quotation.id) }}" 
+                                       class="btn btn-sm btn-outline-primary">View</a>
+                                    <a href="{{ url_for('view_quotation_pdf', quotation_id=quotation.id) }}" 
+                                       class="btn btn-sm btn-outline-info" target="_blank">PDF</a>
+                                    <a href="{{ url_for('download_quotation_pdf', quotation_id=quotation.id) }}" 
+                                       class="btn btn-sm btn-outline-secondary">Download</a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if pagination.pages > 1 %}
+            <nav aria-label="Quotations pagination">
+                <ul class="pagination justify-content-center">
+                    {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('quotations_page', page=pagination.prev_num, status=current_status, search=current_search) }}">Previous</a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in pagination.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != pagination.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('quotations_page', page=page_num, status=current_status, search=current_search) }}">{{ page_num }}</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('quotations_page', page=pagination.next_num, status=current_status, search=current_search) }}">Next</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-file-invoice fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No quotations found</h5>
+                <p class="text-muted">Create your first quotation to get started.</p>
+                <a href="{{ url_for('create_quotation') }}" class="btn btn-success">
+                    <i class="fas fa-plus"></i> Create Quotation
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

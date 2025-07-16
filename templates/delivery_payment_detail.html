@@ -26,7 +26,7 @@
                 <div class="row">
                     <div class="col-sm-6">
                         <p><strong>Payment ID:</strong> #{{ payment.id }}</p>
-                        <p><strong>Amount:</strong> KSh {{ "%.2f"|format(payment.amount) }}</p>
+                        <p><strong>Amount:</strong> KSh{{ "%.2f"|format(payment.amount) }}</p>
                         <p><strong>Payment Method:</strong> {{ payment.payment_method.replace('_', ' ').title() }}</p>
                         <p><strong>Transaction ID:</strong> {{ payment.transaction_id or 'Not provided' }}</p>
                     </div>
@@ -81,7 +81,7 @@
                         {{ payment.delivery.delivery_status.replace('_', ' ').title() }}
                     </span>
                 </p>
-                <p><strong>Delivery Amount:</strong> KSh {{ "%.2f"|format(payment.delivery.delivery_amount) }}</p>
+                <p><strong>Delivery Amount:</strong> KSh{{ "%.2f"|format(payment.delivery.delivery_amount) }}</p>
             </div>
         </div>
     </div>
@@ -125,7 +125,7 @@
                 <div class="timeline-content">
                     <h6>Payment Created</h6>
                     <p class="text-muted">{{ payment.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
-                    <p>Payment of KSh {{ "%.2f"|format(payment.amount) }} was created for delivery #{{ payment.delivery.id }}</p>
+                    <p>Payment of KSh{{ "%.2f"|format(payment.amount) }} was created for delivery #{{ payment.delivery.id }}</p>
                 </div>
             </div>
             

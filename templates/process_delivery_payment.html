@@ -84,7 +84,7 @@
                 <p><strong>Customer:</strong> {{ delivery.order.user.firstname }} {{ delivery.order.user.lastname }}</p>
                 <p><strong>Customer Phone:</strong> {{ delivery.customer_phone }}</p>
                 <p><strong>Location:</strong> {{ delivery.delivery_location }}</p>
-                <p><strong>Delivery Amount:</strong> KSh {{ "%.2f"|format(delivery.delivery_amount) }}</p>
+                <p><strong>Delivery Amount:</strong> KSh{{ "%.2f"|format(delivery.delivery_amount) }}</p>
                 <p><strong>Delivery Status:</strong> 
                     <span class="badge 
                         {% if delivery.delivery_status == 'delivered' %}bg-success

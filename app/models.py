@@ -233,3 +233,41 @@ class DeliveryPayment(db.Model):
 
     delivery = db.relationship('Delivery', backref='payments', lazy=True)
     user = db.relationship('User', backref='delivery_payments', lazy=True)
+
+
+class Quotation(db.Model):
+    __tablename__ = 'quotations'
+    id = db.Column(db.Integer, primary_key=True)
+    quotation_number = db.Column(db.String, unique=True, nullable=False)
+    customer_name = db.Column(db.String, nullable=False)
+    customer_email = db.Column(db.String, nullable=True)
+    customer_phone = db.Column(db.String, nullable=True)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=False)
+    subtotal = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    total_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    status = db.Column(db.String, default='pending')  # pending, accepted, rejected, expired
+    valid_until = db.Column(db.DateTime, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    items = db.relationship('QuotationItem', backref='quotation', lazy=True, cascade='all, delete-orphan')
+    creator = db.relationship('User', backref='quotations_created')
+    branch = db.relationship('Branch', backref='quotations')
+
+
+class QuotationItem(db.Model):
+    __tablename__ = 'quotationitems'
+    id = db.Column(db.Integer, primary_key=True)
+    quotation_id = db.Column(db.Integer, db.ForeignKey('quotations.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    total_price = db.Column(db.Numeric(10, 2), nullable=False)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    product = db.relationship('Product', backref='quotation_items')

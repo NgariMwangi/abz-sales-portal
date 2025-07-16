@@ -113,6 +113,11 @@
             </a>
         </li>
         <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'quotations_page' or request.endpoint == 'quotation_detail' or request.endpoint == 'create_quotation' %}active{% endif %}" href="/quotations">
+                <i class="bi bi-file-earmark-text me-1"></i>Quotations
+            </a>
+        </li>
+        <li class="nav-item">
             <a class="nav-link {% if request.endpoint == 'deliveries_page' or request.endpoint == 'delivery_detail' or request.endpoint == 'create_delivery' %}active{% endif %}" href="/deliveries">
                 <i class="bi bi-truck me-1"></i>Deliveries
             </a>

@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}Create Quotation{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Create Quotation</h2>
+        <a href="{{ url_for('quotations_page') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Quotations
+        </a>
+    </div>
+
+    <form id="createQuotationForm" method="POST">
+        <div class="row">
+            <!-- Customer Information -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Customer Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="customer_name" class="form-label">Customer Name *</label>
+                            <input type="text" class="form-control" id="customer_name" name="customer_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="customer_email" class="form-label">Customer Email</label>
+                            <input type="email" class="form-control" id="customer_email" name="customer_email">
+                        </div>
+                        <div class="mb-3">
+                            <label for="customer_phone" class="form-label">Customer Phone</label>
+                            <input type="tel" class="form-control" id="customer_phone" name="customer_phone">
+                        </div>
+                        <div class="mb-3">
+                            <label for="branch_id" class="form-label">Branch *</label>
+                            <select class="form-select" id="branch_id" name="branch_id" required>
+                                <option value="">Select Branch</option>
+                                {% for branch in branches %}
+                                <option value="{{ branch.id }}">{{ branch.name }} - {{ branch.location }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="valid_until" class="form-label">Valid Until</label>
+                            <input type="date" class="form-control" id="valid_until" name="valid_until">
+                        </div>
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Additional notes..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Selection -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Product Selection</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="category_filter" class="form-label">Filter by Category</label>
+                            <select class="form-select" id="category_filter">
+                                <option value="">All Categories</option>
+                                {% for category in categories %}
+                                <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="product_select" class="form-label">Select Product</label>
+                            <select class="form-select" id="product_select">
+                                <option value="">Choose a product...</option>
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="quantity" class="form-label">Quantity</label>
+                                <input type="number" class="form-control" id="quantity" value="1" min="1">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="unit_price" class="form-label">Unit Price (KSh)</label>
+                                <input type="number" class="form-control" id="unit_price" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="item_notes" class="form-label">Item Notes</label>
+                            <input type="text" class="form-control" id="item_notes" placeholder="Notes for this item...">
+                        </div>
+                        <button type="button" class="btn btn-success w-100" onclick="addProduct()">
+                            <i class="fas fa-plus"></i> Add Product
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quotation Items -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">Quotation Items</h5>
+            </div>
+            <div class="card-body">
+                <div id="quotationItems">
+                    <p class="text-muted">No items added yet.</p>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <h4>Total: KSh<span id="totalAmount">0.00</span></h4>
+                    <button type="submit" class="btn btn-success" id="createQuotationBtn" disabled>Create Quotation</button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <input type="hidden" id="quotationItemsData" name="items" value="[]">
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let quotationItems = [];
+let products = [];
+
+// Load products when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadProducts();
+    
+    // Add event listeners
+    document.getElementById('category_filter').addEventListener('change', loadProducts);
+    document.getElementById('product_select').addEventListener('change', updateProductInfo);
+});
+
+function loadProducts() {
+    const categoryId = document.getElementById('category_filter').value;
+    const branchId = document.getElementById('branch_id').value;
+    
+    let url = '/api/products?';
+    if (categoryId) url += `category_id=${categoryId}&`;
+    if (branchId) url += `branch_id=${branchId}&`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            products = data;
+            updateProductSelect();
+        })
+        .catch(error => {
+            console.error('Error loading products:', error);
+        });
+}
+
+function updateProductSelect() {
+    const select = document.getElementById('product_select');
+    select.innerHTML = '<option value="">Choose a product...</option>';
+    
+    products.forEach(product => {
+        const option = document.createElement('option');
+        option.value = product.id;
+        option.textContent = `${product.name} - KSh${product.selling_price} (Stock: ${product.stock})`;
+        select.appendChild(option);
+    });
+}
+
+function updateProductInfo() {
+    const productId = document.getElementById('product_select').value;
+    const product = products.find(p => p.id == productId);
+    
+    if (product) {
+        document.getElementById('unit_price').value = product.selling_price;
+    } else {
+        document.getElementById('unit_price').value = '';
+    }
+}
+
+function addProduct() {
+    const productId = document.getElementById('product_select').value;
+    const quantity = parseInt(document.getElementById('quantity').value);
+    const unitPrice = parseFloat(document.getElementById('unit_price').value);
+    const notes = document.getElementById('item_notes').value;
+    
+    if (!productId) {
+        alert('Please select a product.');
+        return;
+    }
+    
+    if (!quantity || quantity < 1) {
+        alert('Please enter a valid quantity.');
+        return;
+    }
+    
+    if (!unitPrice || unitPrice < 0) {
+        alert('Please enter a valid unit price.');
+        return;
+    }
+    
+    const product = products.find(p => p.id == productId);
+    if (!product) {
+        alert('Product not found.');
+        return;
+    }
+    
+    if (quantity > product.stock) {
+        alert(`Only ${product.stock} units available in stock.`);
+        return;
+    }
+    
+    // Check if product already exists in quotation
+    const existingItem = quotationItems.find(item => item.product_id == productId);
+    if (existingItem) {
+        existingItem.quantity += quantity;
+        if (existingItem.quantity > product.stock) {
+            alert(`Total quantity (${existingItem.quantity}) exceeds available stock (${product.stock}).`);
+            existingItem.quantity = product.stock;
+        }
+    } else {
+        quotationItems.push({
+            product_id: parseInt(productId),
+            product_name: product.name,
+            quantity: quantity,
+            unit_price: unitPrice,
+            notes: notes
+        });
+    }
+    
+    updateQuotationItemsDisplay();
+    updateTotal();
+    
+    // Reset form
+    document.getElementById('product_select').value = '';
+    document.getElementById('quantity').value = '1';
+    document.getElementById('unit_price').value = '';
+    document.getElementById('item_notes').value = '';
+}
+
+function removeProduct(index) {
+    quotationItems.splice(index, 1);
+    updateQuotationItemsDisplay();
+    updateTotal();
+}
+
+function updateQuotationItemsDisplay() {
+    const container = document.getElementById('quotationItems');
+    
+    if (quotationItems.length === 0) {
+        container.innerHTML = '<p class="text-muted">No items added yet.</p>';
+        return;
+    }
+    
+    let html = `
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                    <th>Notes</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    quotationItems.forEach((item, index) => {
+        const total = item.quantity * item.unit_price;
+        html += `
+            <tr>
+                <td>${item.product_name}</td>
+                <td>${item.quantity}</td>
+                <td>KSh${item.unit_price.toFixed(2)}</td>
+                <td>KSh${total.toFixed(2)}</td>
+                <td>${item.notes || '-'}</td>
+                <td>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removeProduct(${index})">
+                        Remove
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function updateTotal() {
+    const total = quotationItems.reduce((sum, item) => {
+        return sum + (item.quantity * item.unit_price);
+    }, 0);
+    document.getElementById('totalAmount').textContent = total.toFixed(2);
+    document.getElementById('quotationItemsData').value = JSON.stringify(quotationItems);
+    document.getElementById('createQuotationBtn').disabled = quotationItems.length === 0;
+}
+
+// Handle form submission
+document.getElementById('createQuotationForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (quotationItems.length === 0) {
+        alert('Please add at least one product to the quotation.');
+        return;
+    }
+    
+    const formData = new FormData(this);
+    formData.set('items', JSON.stringify(quotationItems));
+    
+    // Show loading state
+    const submitBtn = document.getElementById('createQuotationBtn');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = 'Creating...';
+    submitBtn.disabled = true;
+    
+    fetch('/quotations/create', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            alert(`Quotation created successfully! Quotation ID: ${data.quotation_id}`);
+            window.location.href = `/quotations/${data.quotation_id}`;
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while creating the quotation. Please try again.');
+    })
+    .finally(() => {
+        // Reset button state
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+    });
+});
+
+// Update products when branch changes
+document.getElementById('branch_id').addEventListener('change', loadProducts);
+</script>
+{% endblock %} 

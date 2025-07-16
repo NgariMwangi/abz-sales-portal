@@ -1,14 +1,15 @@
-from flask import Flask, jsonify, request, render_template, redirect, url_for, flash
+from flask import Flask, jsonify, request, render_template, redirect, url_for, flash, make_response
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import json
 import os
+from datetime import datetime
 
 # Import app initialization and models
 from app import init_app, db, login_manager
 from app.models import *
 from app.decorators import sales_required
-from app.services import OrderService, PaymentService, StockService, AuthService
+from app.services import OrderService, PaymentService, StockService, AuthService, QuotationService
 from app.utils import create_invoice_for_order, create_receipt_for_payment
 
 # Import email service and config
@@ -380,7 +381,12 @@ def order_detail(order_id):
     total_amount = 0
     for item in order.order_items:
         # Use final_price for calculations (includes negotiated prices)
-        final_price = float(item.final_price) if item.final_price is not None else float(item.product.sellingprice)
+        if item.final_price is not None:
+            final_price = float(item.final_price)
+        elif item.product.sellingprice is not None:
+            final_price = float(item.product.sellingprice)
+        else:
+            final_price = 0.0  # Fallback to zero if no price available
         item_total = item.quantity * final_price
         total_amount += item_total
         
@@ -398,13 +404,29 @@ def order_detail(order_id):
                 if product_used:
                     fulfillment_branch = product_used.branch.name
         
+        # Handle original price
+        if item.original_price is not None:
+            original_price = float(item.original_price)
+        elif item.product.sellingprice is not None:
+            original_price = float(item.product.sellingprice)
+        else:
+            original_price = 0.0
+        
+        # Handle final price for display
+        if item.final_price is not None:
+            display_final_price = float(item.final_price)
+        elif item.product.sellingprice is not None:
+            display_final_price = float(item.product.sellingprice)
+        else:
+            display_final_price = 0.0
+        
         order_data['order_items'].append({
             'id': item.id,
             'product_name': item.product.name,
             'quantity': item.quantity,
-            'original_price': float(item.original_price) if item.original_price is not None else float(item.product.sellingprice),
+            'original_price': original_price,
             'negotiated_price': float(item.negotiated_price) if item.negotiated_price else None,
-            'final_price': float(item.final_price) if item.final_price is not None else float(item.product.sellingprice),
+            'final_price': display_final_price,
             'total': item_total,
             'fulfillment_branch': fulfillment_branch
         })
@@ -468,6 +490,7 @@ def select_fulfillment_branch(order_id):
 
 @app.route("/orders/<int:order_id>/approve", methods=['POST'])
 @login_required
+@sales_required
 def approve_order(order_id):
     try:
         # Get the branch selections from the request
@@ -490,6 +513,7 @@ def approve_order(order_id):
 
 @app.route("/orders/<int:order_id>/reject", methods=['POST'])
 @login_required
+@sales_required
 def reject_order(order_id):
     try:
         success, message = OrderService.reject_order(order_id)
@@ -1041,6 +1065,32 @@ def invoice_detail(invoice_id):
                          user=current_user,
                          invoice=invoice_data)
 
+@app.route("/invoices/<int:invoice_id>/print")
+@login_required
+@sales_required
+def print_invoice(invoice_id):
+    """Print invoice PDF"""
+    try:
+        invoice = Invoice.query.get_or_404(invoice_id)
+        
+        # Generate PDF
+        from app.pdf_utils import generate_invoice_pdf
+        pdf_buffer = generate_invoice_pdf(invoice.id)
+        
+        # Return PDF for printing
+        from flask import send_file
+        pdf_buffer.seek(0)
+        return send_file(
+            pdf_buffer,
+            as_attachment=False,  # This makes it view in browser
+            download_name=f"invoice_{invoice.invoice_number}.pdf",
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'danger')
+        return redirect(url_for('invoice_detail', invoice_id=invoice_id))
+
 @app.route("/receipts")
 @login_required
 def receipts_page():
@@ -1075,25 +1125,171 @@ def receipts_page():
 def receipt_detail(receipt_id):
     receipt = Receipt.query.get_or_404(receipt_id)
     
-    receipt_data = {
-        'id': receipt.id,
-        'receipt_number': receipt.receipt_number,
-        'order_id': receipt.orderid,
-        'customer_name': f"{receipt.order.user.firstname} {receipt.order.user.lastname}",
-        'customer_email': receipt.order.user.email,
-        'payment_amount': float(receipt.payment_amount),
-        'previous_balance': float(receipt.previous_balance),
-        'remaining_balance': float(receipt.remaining_balance),
-        'payment_method': receipt.payment_method,
-        'reference_number': receipt.reference_number,
-        'transaction_id': receipt.transaction_id,
-        'notes': receipt.notes,
-        'created_at': receipt.created_at.strftime('%Y-%m-%d %H:%M')
-    }
-    
+    # Pass the actual receipt object instead of converting to dictionary
+    # This allows the template to access receipt.order.order_items
     return render_template('receipt_detail.html',
                          user=current_user,
-                         receipt=receipt_data)
+                         receipt=receipt)
+
+@app.route("/receipts/<int:receipt_id>/print")
+@login_required
+@sales_required
+def print_receipt(receipt_id):
+    """Print receipt PDF"""
+    try:
+        receipt = Receipt.query.get_or_404(receipt_id)
+        
+        # Generate PDF
+        from app.pdf_utils import generate_receipt_pdf
+        pdf_buffer = generate_receipt_pdf(receipt.id)
+        
+        # Return PDF for printing
+        from flask import send_file
+        pdf_buffer.seek(0)
+        return send_file(
+            pdf_buffer,
+            as_attachment=False,  # This makes it view in browser
+            download_name=f"receipt_{receipt.receipt_number}.pdf",
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'danger')
+        return redirect(url_for('receipt_detail', receipt_id=receipt_id))
+
+@app.route("/receipts/<int:receipt_id>/pdf")
+@login_required
+@sales_required
+def download_receipt_pdf(receipt_id):
+    """Generate and download PDF receipt"""
+    try:
+        receipt = Receipt.query.get_or_404(receipt_id)
+        
+        # Generate PDF
+        from app.pdf_utils import generate_receipt_pdf
+        pdf_buffer = generate_receipt_pdf(receipt.id)
+        
+        # Return PDF as download
+        from flask import send_file
+        pdf_buffer.seek(0)
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name=f"receipt_{receipt.receipt_number}.pdf",
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'danger')
+        return redirect(url_for('receipt_detail', receipt_id=receipt_id))
+
+@app.route("/receipts/<int:receipt_id>/view")
+@login_required
+@sales_required
+def view_receipt_pdf(receipt_id):
+    """View PDF receipt in the browser"""
+    try:
+        receipt = Receipt.query.get_or_404(receipt_id)
+        
+        # Generate PDF
+        from app.pdf_utils import generate_receipt_pdf
+        pdf_buffer = generate_receipt_pdf(receipt.id)
+        
+        # Return PDF for viewing in browser
+        from flask import send_file
+        pdf_buffer.seek(0)
+        return send_file(
+            pdf_buffer,
+            as_attachment=False,  # This makes it view in browser
+            download_name=f"receipt_{receipt.receipt_number}.pdf",
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'danger')
+        return redirect(url_for('receipt_detail', receipt_id=receipt_id))
+
+@app.route("/receipts/<int:receipt_id>/email")
+@login_required
+@sales_required
+def send_receipt_email(receipt_id):
+    """Send receipt email with PDF attachment"""
+    try:
+        receipt = Receipt.query.get_or_404(receipt_id)
+        order = receipt.order
+        user = order.user
+        
+        # Generate PDF
+        from app.pdf_utils import generate_receipt_pdf
+        pdf_buffer = generate_receipt_pdf(receipt.id)
+        pdf_bytes = pdf_buffer.getvalue()
+        
+        # Send email
+        from email_service import get_email_service
+        email_service = get_email_service()
+        
+        if email_service:
+            result = email_service.send_receipt_email(
+                to_email=user.email,
+                user_name=f"{user.firstname} {user.lastname}",
+                order_id=order.id,
+                receipt_number=receipt.receipt_number,
+                payment_amount=float(receipt.payment_amount),
+                pdf_attachment=pdf_bytes
+            )
+            
+            if result.get('success'):
+                flash(f'Receipt email sent successfully to {user.email}', 'success')
+            else:
+                flash(f'Failed to send receipt email: {result.get("error")}', 'danger')
+        else:
+            flash('Email service not configured', 'warning')
+            
+    except Exception as e:
+        flash(f'Error sending receipt email: {str(e)}', 'danger')
+    
+    return redirect(url_for('receipt_detail', receipt_id=receipt_id))
+
+@app.route("/debug/send-receipt-email/<int:receipt_id>")
+@login_required
+@sales_required
+def debug_send_receipt_email(receipt_id):
+    """Debug route to manually send receipt email"""
+    try:
+        receipt = Receipt.query.get_or_404(receipt_id)
+        order = receipt.order
+        user = order.user
+        
+        # Generate PDF
+        from app.pdf_utils import generate_receipt_pdf
+        pdf_buffer = generate_receipt_pdf(receipt.id)
+        pdf_bytes = pdf_buffer.getvalue()
+        
+        # Send email
+        from email_service import get_email_service
+        email_service = get_email_service()
+        
+        if email_service:
+            result = email_service.send_receipt_email(
+                to_email=user.email,
+                user_name=f"{user.firstname} {user.lastname}",
+                order_id=order.id,
+                receipt_number=receipt.receipt_number,
+                payment_amount=float(receipt.payment_amount),
+                pdf_attachment=pdf_bytes
+            )
+            
+            if result.get('success'):
+                flash(f'Receipt email sent successfully to {user.email}', 'success')
+            else:
+                flash(f'Failed to send receipt email: {result.get("error")}', 'danger')
+        else:
+            flash('Email service not configured', 'warning')
+            
+    except Exception as e:
+        flash(f'Error sending receipt email: {str(e)}', 'danger')
+    
+    return redirect(url_for('receipt_detail', receipt_id=receipt_id))
 
 @app.route("/test-email")
 def test_email():
@@ -1165,6 +1361,7 @@ def negotiate_order_prices(order_id):
             negotiations = data.get('negotiations', [])
             
             total_updated = 0
+            total_processed = 0
             for negotiation in negotiations:
                 order_item_id = negotiation.get('order_item_id')
                 new_price = negotiation.get('new_price')
@@ -1178,13 +1375,26 @@ def negotiate_order_prices(order_id):
                         current_user
                     )
                     if success:
-                        total_updated += 1
+                        # Check if the message indicates no changes were made
+                        if 'No changes made' in message:
+                            total_processed += 1
+                        else:
+                            total_updated += 1
+                            total_processed += 1
+                    else:
+                        total_processed += 1
             
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({
-                    'success': True, 
-                    'message': f'{total_updated} items updated successfully'
-                })
+                if total_updated == 0 and total_processed > 0:
+                    return jsonify({
+                        'success': True, 
+                        'message': 'No changes were made to prices or notes'
+                    })
+                else:
+                    return jsonify({
+                        'success': True, 
+                        'message': f'{total_updated} items updated successfully'
+                    })
             
             flash(f'{total_updated} items updated successfully', 'success')
             return redirect(url_for('order_detail', order_id=order_id))
@@ -1199,9 +1409,19 @@ def negotiate_order_prices(order_id):
     order_items_data = []
     for item in order.order_items:
         # Handle None values for price fields
-        original_price = float(item.original_price) if item.original_price is not None else float(item.product.sellingprice)
+        if item.original_price is not None:
+            original_price = float(item.original_price)
+        elif item.product.sellingprice is not None:
+            original_price = float(item.product.sellingprice)
+        else:
+            original_price = 0.0
+        
         negotiated_price = float(item.negotiated_price) if item.negotiated_price is not None else None
-        final_price = float(item.final_price) if item.final_price is not None else original_price
+        
+        if item.final_price is not None:
+            final_price = float(item.final_price)
+        else:
+            final_price = original_price
         
         order_items_data.append({
             'id': item.id,
@@ -1612,6 +1832,380 @@ def refund_delivery_payment(payment_id):
             return jsonify({'success': False, 'message': f'Error refunding payment: {str(e)}'})
         flash(f'Error refunding payment: {str(e)}', 'danger')
         return redirect(url_for('delivery_payment_detail', payment_id=payment_id))
+
+@app.route("/orders/<int:order_id>/invoice/pdf")
+@login_required
+@sales_required
+def download_invoice_pdf(order_id):
+    """Generate and download PDF invoice for an order"""
+    try:
+        order = Order.query.get_or_404(order_id)
+        
+        # Get the invoice for this order
+        invoice = Invoice.query.filter_by(orderid=order.id).first()
+        if not invoice:
+            flash('No invoice found for this order', 'warning')
+            return redirect(url_for('order_detail', order_id=order_id))
+        
+        # Generate PDF
+        from app.pdf_utils import generate_invoice_pdf
+        pdf_buffer = generate_invoice_pdf(invoice.id)
+        
+        # Return PDF as download
+        from flask import send_file
+        pdf_buffer.seek(0)
+        return send_file(
+            pdf_buffer,
+            as_attachment=True,
+            download_name=f"invoice_{invoice.invoice_number}.pdf",
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'danger')
+        return redirect(url_for('order_detail', order_id=order_id))
+
+@app.route("/orders/<int:order_id>/invoice/send")
+@login_required
+@sales_required
+def send_invoice_email(order_id):
+    """Manually send invoice email for an order"""
+    try:
+        order = Order.query.get_or_404(order_id)
+        
+        # Get the invoice for this order
+        invoice = Invoice.query.filter_by(orderid=order.id).first()
+        if not invoice:
+            flash('No invoice found for this order', 'warning')
+            return redirect(url_for('order_detail', order_id=order_id))
+        
+        # Generate PDF and send email
+        from app.pdf_utils import generate_invoice_pdf
+        from email_service import get_email_service
+        
+        pdf_data = generate_invoice_pdf(invoice.id)
+        email_service = get_email_service()
+        
+        if email_service:
+            email_result = email_service.send_invoice_email(
+                to_email=order.user.email,
+                user_name=f"{order.user.firstname} {order.user.lastname}",
+                order_id=order.id,
+                invoice_number=invoice.invoice_number,
+                pdf_attachment=pdf_data.getvalue()
+            )
+            
+            if email_result['success']:
+                flash('Invoice email sent successfully!', 'success')
+            else:
+                flash(f'Failed to send invoice email: {email_result.get("error", "Unknown error")}', 'danger')
+        else:
+            flash('Email service not available', 'warning')
+        
+        return redirect(url_for('order_detail', order_id=order_id))
+        
+    except Exception as e:
+        flash(f'Error sending invoice email: {str(e)}', 'danger')
+        return redirect(url_for('order_detail', order_id=order_id))
+
+@app.route("/orders/<int:order_id>/create-invoice")
+@login_required
+@sales_required
+def create_invoice_for_order_manual(order_id):
+    """Manually create an invoice for an order (for debugging)"""
+    try:
+        order = Order.query.get_or_404(order_id)
+        
+        # Check if invoice already exists
+        existing_invoice = Invoice.query.filter_by(orderid=order.id).first()
+        if existing_invoice:
+            flash(f'Invoice already exists: {existing_invoice.invoice_number}', 'info')
+            return redirect(url_for('order_detail', order_id=order_id))
+        
+        # Calculate total amount for the order
+        total_amount = 0
+        for item in order.order_items:
+            if item.final_price is not None:
+                item_price = float(item.final_price)
+            elif item.product.sellingprice is not None:
+                item_price = float(item.product.sellingprice)
+            else:
+                item_price = 0.0
+            total_amount += item.quantity * item_price
+        
+        # Create invoice for the order
+        from app.utils import create_invoice_for_order
+        invoice = create_invoice_for_order(order, total_amount)
+        
+        flash(f'Invoice created successfully: {invoice.invoice_number}', 'success')
+        return redirect(url_for('order_detail', order_id=order_id))
+        
+    except Exception as e:
+        flash(f'Error creating invoice: {str(e)}', 'danger')
+        return redirect(url_for('order_detail', order_id=order_id))
+
+@app.route("/debug/invoices")
+@login_required
+def debug_invoices():
+    """Debug route to check invoice status for all orders"""
+    try:
+        # Get all orders
+        orders = Order.query.all()
+        
+        invoice_status = []
+        for order in orders:
+            invoice = Invoice.query.filter_by(orderid=order.id).first()
+            total_amount = sum(
+                item.quantity * (float(item.final_price) if item.final_price is not None else float(item.product.sellingprice) if item.product.sellingprice is not None else 0.0)
+                for item in order.order_items
+            )
+            
+            invoice_status.append({
+                'order_id': order.id,
+                'order_type': order.ordertype.name,
+                'status': 'Approved' if order.approvalstatus else 'Pending',
+                'total_amount': total_amount,
+                'has_invoice': invoice is not None,
+                'invoice_number': invoice.invoice_number if invoice else None,
+                'invoice_amount': float(invoice.total_amount) if invoice else None,
+                'created_at': order.created_at.strftime('%Y-%m-%d %H:%M')
+            })
+        
+        return jsonify({
+            'success': True,
+            'invoice_status': invoice_status,
+            'total_orders': len(orders),
+            'orders_with_invoices': len([o for o in invoice_status if o['has_invoice']]),
+            'orders_without_invoices': len([o for o in invoice_status if not o['has_invoice']])
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route("/orders/<int:order_id>/invoice/view")
+@login_required
+@sales_required
+def view_invoice_pdf(order_id):
+    """View PDF invoice in the browser"""
+    try:
+        order = Order.query.get_or_404(order_id)
+        
+        # Get the invoice for this order
+        invoice = Invoice.query.filter_by(orderid=order.id).first()
+        if not invoice:
+            flash('No invoice found for this order', 'warning')
+            return redirect(url_for('order_detail', order_id=order_id))
+        
+        # Generate PDF
+        from app.pdf_utils import generate_invoice_pdf
+        pdf_buffer = generate_invoice_pdf(invoice.id)
+        
+        # Return PDF for viewing in browser
+        from flask import send_file
+        pdf_buffer.seek(0)
+        return send_file(
+            pdf_buffer,
+            as_attachment=False,  # This makes it view in browser
+            download_name=f"invoice_{invoice.invoice_number}.pdf",
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'danger')
+        return redirect(url_for('order_detail', order_id=order_id))
+
+# Quotation Management Routes
+@app.route("/quotations")
+@login_required
+def quotations_page():
+    """List all quotations"""
+    page = request.args.get('page', 1, type=int)
+    status = request.args.get('status', '')
+    search = request.args.get('search', '')
+    
+    query = Quotation.query
+    
+    if status:
+        query = query.filter_by(status=status)
+    if search:
+        query = query.filter(Quotation.customer_name.ilike(f'%{search}%'))
+    
+    # For non-admin users, show only their quotations
+    if current_user.role != 'admin':
+        query = query.filter_by(created_by=current_user.id)
+    
+    quotations = query.order_by(Quotation.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
+    
+    return render_template('quotations.html',
+                         user=current_user,
+                         quotations=quotations.items,
+                         pagination=quotations,
+                         current_status=status,
+                         current_search=search)
+
+
+@app.route("/quotations/create", methods=['GET', 'POST'])
+@login_required
+def create_quotation():
+    """Create a new quotation"""
+    if request.method == 'POST':
+        try:
+            # Handle both JSON and form data
+            if request.is_json:
+                data = request.get_json()
+            else:
+                data = request.form.to_dict()
+                # Convert items from string to list if it's form data
+                if 'items' in data and isinstance(data['items'], str):
+                    try:
+                        data['items'] = json.loads(data['items'])
+                    except json.JSONDecodeError:
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return jsonify({'success': False, 'message': 'Invalid items data format'})
+                        flash('Invalid items data format', 'danger')
+                        return redirect(url_for('create_quotation'))
+            
+            # Validate required fields
+            if not data.get('customer_name') or not data.get('branch_id'):
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'success': False, 'message': 'Customer name and branch are required'})
+                flash('Customer name and branch are required', 'danger')
+                return redirect(url_for('create_quotation'))
+            
+            if not data.get('items') or len(data['items']) == 0:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'success': False, 'message': 'At least one item is required'})
+                flash('At least one item is required', 'danger')
+                return redirect(url_for('create_quotation'))
+            
+            success, quotation_id, total_amount = QuotationService.create_quotation(data, current_user)
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'success': True,
+                    'quotation_id': quotation_id,
+                    'total_amount': total_amount,
+                    'message': 'Quotation created successfully'
+                })
+            
+            flash(f'Quotation created successfully! Quotation ID: {quotation_id}', 'success')
+            return redirect(url_for('quotation_detail', quotation_id=quotation_id))
+            
+        except Exception as e:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': str(e)})
+            flash(f'Error creating quotation: {str(e)}', 'danger')
+            return redirect(url_for('create_quotation'))
+    
+    # GET request - show form
+    branches = Branch.query.all()
+    products = Product.query.filter_by(display=True).all()
+    categories = Category.query.all()
+    
+    return render_template('create_quotation.html',
+                         user=current_user,
+                         branches=branches,
+                         products=products,
+                         categories=categories)
+
+
+@app.route("/quotations/<int:quotation_id>")
+@login_required
+def quotation_detail(quotation_id):
+    """View quotation details"""
+    quotation = Quotation.query.get_or_404(quotation_id)
+    
+    # Check if user has access to this quotation
+    if current_user.role != 'admin' and quotation.created_by != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('quotations_page'))
+    
+    return render_template('quotation_detail.html',
+                         user=current_user,
+                         quotation=quotation)
+
+
+@app.route("/quotations/<int:quotation_id>/pdf")
+@login_required
+def view_quotation_pdf(quotation_id):
+    """View quotation PDF in browser"""
+    quotation = Quotation.query.get_or_404(quotation_id)
+    
+    # Check if user has access to this quotation
+    if current_user.role != 'admin' and quotation.created_by != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('quotations_page'))
+    
+    try:
+        from app.pdf_utils import generate_quotation_pdf
+        pdf_buffer = generate_quotation_pdf(quotation_id)
+        
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=quotation_{quotation.quotation_number}.pdf'
+        return response
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'danger')
+        return redirect(url_for('quotation_detail', quotation_id=quotation_id))
+
+
+@app.route("/quotations/<int:quotation_id>/download")
+@login_required
+def download_quotation_pdf(quotation_id):
+    """Download quotation PDF"""
+    quotation = Quotation.query.get_or_404(quotation_id)
+    
+    # Check if user has access to this quotation
+    if current_user.role != 'admin' and quotation.created_by != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('quotations_page'))
+    
+    try:
+        from app.pdf_utils import generate_quotation_pdf
+        pdf_buffer = generate_quotation_pdf(quotation_id)
+        
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=quotation_{quotation.quotation_number}.pdf'
+        return response
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'danger')
+        return redirect(url_for('quotation_detail', quotation_id=quotation_id))
+
+
+@app.route("/quotations/<int:quotation_id>/status", methods=['POST'])
+@login_required
+def update_quotation_status(quotation_id):
+    """Update quotation status"""
+    quotation = Quotation.query.get_or_404(quotation_id)
+    
+    # Check if user has access to this quotation
+    if current_user.role != 'admin' and quotation.created_by != current_user.id:
+        return jsonify({'success': False, 'message': 'Access denied'})
+    
+    try:
+        data = request.get_json() if request.is_json else request.form.to_dict()
+        new_status = data.get('status')
+        
+        if not new_status:
+            return jsonify({'success': False, 'message': 'Status is required'})
+        
+        success, message = QuotationService.update_quotation_status(quotation_id, new_status)
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': success, 'message': message})
+        
+        flash(message, 'success' if success else 'danger')
+        return redirect(url_for('quotation_detail', quotation_id=quotation_id))
+        
+    except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': str(e)})
+        flash(f'Error updating quotation status: {str(e)}', 'danger')
+        return redirect(url_for('quotation_detail', quotation_id=quotation_id))
 
 if __name__ == '__main__':
     app.run(debug=False)

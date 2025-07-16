@@ -3,6 +3,7 @@ from werkzeug.security import generate_password_hash
 from app import db
 from app.models import Order, Payment, Invoice, Receipt, StockTransaction, PasswordReset, User, Product, OrderItem, OrderType
 from app.utils import create_invoice_for_order, create_receipt_for_payment
+from app.pdf_utils import generate_invoice_pdf
 from email_service import get_email_service
 
 
@@ -83,7 +84,46 @@ class OrderService:
                     db.session.add(stock_transaction)
             
             db.session.commit()
-            return True, 'Order approved successfully!'
+            
+            # Generate and send PDF invoice
+            try:
+                # Check if invoice exists, if not create one
+                invoice = Invoice.query.filter_by(orderid=order.id).first()
+                if not invoice:
+                    # Calculate total amount for the order
+                    total_amount = 0
+                    for item in order.order_items:
+                        if item.final_price is not None:
+                            item_price = float(item.final_price)
+                        elif item.product.sellingprice is not None:
+                            item_price = float(item.product.sellingprice)
+                        else:
+                            item_price = 0.0
+                        total_amount += item.quantity * item_price
+                    
+                    # Create invoice for the order
+                    invoice = create_invoice_for_order(order, total_amount)
+                    print(f"Created invoice {invoice.invoice_number} for order {order.id}")
+                
+                # Generate PDF and send email
+                pdf_data = generate_invoice_pdf(invoice.id)
+                email_service = get_email_service()
+                if email_service:
+                    email_result = email_service.send_invoice_email(
+                        to_email=order.user.email,
+                        user_name=f"{order.user.firstname} {order.user.lastname}",
+                        order_id=order.id,
+                        invoice_number=invoice.invoice_number,
+                        pdf_attachment=pdf_data.getvalue()
+                    )
+                    if not email_result['success']:
+                        print(f"Warning: Could not send invoice PDF to {order.user.email}: {email_result.get('error', 'Unknown error')}")
+                else:
+                    print(f"Warning: Email service not available for sending invoice PDF to {order.user.email}")
+            except Exception as e:
+                print(f"Warning: Could not generate or send invoice PDF for order {order.id}: {str(e)}")
+
+            return True, 'Order approved successfully! Invoice has been generated and sent to your email.'
         return False, 'Order is already approved.'
     
     @staticmethod
@@ -141,7 +181,11 @@ class OrderService:
                         raise ValueError(f'Product {product.name} has no valid selling price')
                 
                 # Handle negotiated price if provided
-                negotiated_price = float(item_data.get('negotiated_price', original_price))
+                negotiated_price_raw = item_data.get('negotiated_price')
+                if negotiated_price_raw is not None:
+                    negotiated_price = float(negotiated_price_raw)
+                else:
+                    negotiated_price = original_price
                 final_price = negotiated_price if negotiated_price != original_price else original_price
                 negotiation_notes = item_data.get('negotiation_notes', None)
                 
@@ -182,8 +226,23 @@ class OrderService:
             if order_item.order.approvalstatus:
                 return False, 'Cannot negotiate prices for approved orders'
             
+            # Check if there are any actual changes
+            if order_item.final_price is not None:
+                current_price = float(order_item.final_price)
+            elif order_item.product.sellingprice is not None:
+                current_price = float(order_item.product.sellingprice)
+            else:
+                return False, 'Product has no valid selling price'
+            current_notes = order_item.negotiation_notes or ''
+            
+            # Check if price or notes have actually changed
+            price_changed = abs(float(new_price) - current_price) > 0.01  # Allow for small floating point differences
+            notes_changed = notes.strip() != current_notes.strip()
+            
+            if not price_changed and not notes_changed:
+                return True, 'No changes made to this item'
+            
             # Update the negotiated price
-            old_final_price = float(order_item.final_price) if order_item.final_price is not None else float(order_item.product.sellingprice)
             order_item.negotiated_price = float(new_price)
             order_item.final_price = float(new_price)
             order_item.negotiation_notes = notes
@@ -191,7 +250,15 @@ class OrderService:
             
             # Recalculate order total
             order = order_item.order
-            total_amount = sum(item.quantity * (float(item.final_price) if item.final_price is not None else float(item.product.sellingprice)) for item in order.order_items)
+            total_amount = 0
+            for item in order.order_items:
+                if item.final_price is not None:
+                    item_price = float(item.final_price)
+                elif item.product.sellingprice is not None:
+                    item_price = float(item.product.sellingprice)
+                else:
+                    item_price = 0.0
+                total_amount += item.quantity * item_price
             
             db.session.commit()
             
@@ -237,10 +304,18 @@ class PaymentService:
             
             db.session.commit()
             
-            # Calculate balance and create receipt
+            # Calculate balance and create receipt (keep this synchronous for immediate feedback)
             try:
                 # Calculate total order amount
-                total_order_amount = sum(item.quantity * item.product.sellingprice for item in order.order_items)
+                total_order_amount = 0
+                for item in order.order_items:
+                    if item.final_price is not None:
+                        item_price = float(item.final_price)
+                    elif item.product.sellingprice is not None:
+                        item_price = float(item.product.sellingprice)
+                    else:
+                        item_price = 0.0
+                    total_order_amount += item.quantity * item_price
                 
                 # Calculate previous balance (total amount minus previous payments)
                 previous_payments = Payment.query.filter_by(
@@ -252,7 +327,39 @@ class PaymentService:
                 remaining_balance = previous_balance - float(amount)
                 
                 # Create receipt
-                create_receipt_for_payment(payment, previous_balance, remaining_balance)
+                receipt = create_receipt_for_payment(payment, previous_balance, remaining_balance)
+                
+                # Send email asynchronously (don't wait for it)
+                import threading
+                def send_receipt_email_async():
+                    try:
+                        from app.pdf_utils import generate_receipt_pdf
+                        from email_service import get_email_service
+                        
+                        pdf_buffer = generate_receipt_pdf(receipt.id)
+                        email_service = get_email_service()
+                        
+                        if email_service:
+                            email_result = email_service.send_receipt_email(
+                                to_email=order.user.email,
+                                user_name=f"{order.user.firstname} {order.user.lastname}",
+                                order_id=order.id,
+                                receipt_number=receipt.receipt_number,
+                                payment_amount=float(receipt.payment_amount),
+                                pdf_attachment=pdf_buffer.getvalue()
+                            )
+                            if not email_result['success']:
+                                print(f"Warning: Could not send receipt PDF to {order.user.email}: {email_result.get('error', 'Unknown error')}")
+                        else:
+                            print(f"Warning: Email service not available for sending receipt PDF to {order.user.email}")
+                            
+                    except Exception as e:
+                        print(f"Warning: Could not send receipt email for payment {payment.id}: {str(e)}")
+                
+                # Start email sending in background thread
+                email_thread = threading.Thread(target=send_receipt_email_async)
+                email_thread.daemon = True
+                email_thread.start()
                 
             except Exception as e:
                 print(f"Warning: Could not create receipt for payment {payment.id}: {str(e)}")
@@ -406,6 +513,106 @@ class AuthService:
             
             return True, 'Password reset successfully'
             
+        except Exception as e:
+            db.session.rollback()
+            raise e 
+
+class QuotationService:
+    """Service class for quotation-related operations"""
+    
+    @staticmethod
+    def generate_quotation_number():
+        """Generate a unique quotation number"""
+        import random
+        import string
+        
+        while True:
+            # Generate a random 6-digit number
+            number = ''.join(random.choices(string.digits, k=6))
+            quotation_number = f"QT-{number}"
+            
+            # Check if it already exists
+            from app.models import Quotation
+            existing = Quotation.query.filter_by(quotation_number=quotation_number).first()
+            if not existing:
+                return quotation_number
+    
+    @staticmethod
+    def create_quotation(data, current_user):
+        """Create a new quotation"""
+        try:
+            from app.models import Quotation, QuotationItem, Product
+            
+            # Generate quotation number
+            quotation_number = QuotationService.generate_quotation_number()
+            
+            # Create quotation
+            quotation = Quotation(
+                quotation_number=quotation_number,
+                customer_name=data['customer_name'],
+                customer_email=data.get('customer_email'),
+                customer_phone=data.get('customer_phone'),
+                created_by=current_user.id,
+                branch_id=int(data['branch_id']),
+                valid_until=datetime.strptime(data['valid_until'], '%Y-%m-%d') if data.get('valid_until') else None,
+                notes=data.get('notes', ''),
+                subtotal=0.00,
+                total_amount=0.00
+            )
+            
+            db.session.add(quotation)
+            db.session.flush()
+            
+            # Add quotation items
+            total_amount = 0
+            items_data = data.get('items', [])
+            
+            for item_data in items_data:
+                if not item_data.get('product_id') or not item_data.get('quantity'):
+                    raise ValueError('Product ID and quantity are required for each item')
+                
+                product = Product.query.get_or_404(int(item_data['product_id']))
+                quantity = int(item_data['quantity'])
+                unit_price = float(item_data.get('unit_price', product.sellingprice or 0))
+                
+                if quantity <= 0:
+                    raise ValueError(f'Invalid quantity for product {product.name}')
+                
+                item_total = quantity * unit_price
+                total_amount += item_total
+                
+                quotation_item = QuotationItem(
+                    quotation_id=quotation.id,
+                    product_id=product.id,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    total_price=item_total,
+                    notes=item_data.get('notes', '')
+                )
+                db.session.add(quotation_item)
+            
+            # Update quotation totals
+            quotation.subtotal = total_amount
+            quotation.total_amount = total_amount
+            
+            db.session.commit()
+            
+            return True, quotation.id, total_amount
+            
+        except Exception as e:
+            db.session.rollback()
+            raise e
+    
+    @staticmethod
+    def update_quotation_status(quotation_id, status):
+        """Update quotation status"""
+        try:
+            from app.models import Quotation
+            quotation = Quotation.query.get_or_404(quotation_id)
+            quotation.status = status
+            quotation.updated_at = datetime.utcnow()
+            db.session.commit()
+            return True, f'Quotation status updated to {status}'
         except Exception as e:
             db.session.rollback()
             raise e 

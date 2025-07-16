@@ -73,7 +73,7 @@
                             </a>
                         </td>
                         <td>{{ payment.delivery.order.user.firstname }} {{ payment.delivery.order.user.lastname }}</td>
-                        <td>KSh {{ "%.2f"|format(payment.amount) }}</td>
+                        <td>KSh{{ "%.2f"|format(payment.amount) }}</td>
                         <td>{{ payment.payment_method.replace('_', ' ').title() }}</td>
                         <td>
                             <span class="badge 
