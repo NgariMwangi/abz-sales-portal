@@ -166,7 +166,7 @@ document.getElementById('order_id').addEventListener('change', function() {
                         <p><strong>Customer:</strong> ${order.customer_name}</p>
                         <p><strong>Order Type:</strong> ${order.order_type}</p>
                         <p><strong>Branch:</strong> ${order.branch}</p>
-                        <p><strong>Total Amount:</strong> KSh ${parseFloat(order.total_amount).toFixed(2)}</p>
+                        <p><strong>Total Amount:</strong> KSh${parseFloat(order.total_amount).toFixed(2)}</p>
                         <p><strong>Status:</strong> <span class="badge ${order.status === 'Approved' ? 'bg-success' : 'bg-warning'}">${order.status}</span></p>
                         <p><strong>Created:</strong> ${new Date(order.created_at).toLocaleDateString()}</p>
                     `;

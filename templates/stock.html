@@ -54,7 +54,7 @@
                             <br><small class="text-muted">Code: {{ product.productcode }}</small>
                             {% endif %}
                         </td>
-                        <td>{{ product.category.name }}</td>
+                                                        <td>{{ product.sub_category.category.name if product.sub_category and product.sub_category.category else 'Uncategorized' }}</td>
                         <td>
                             <span class="badge {% if product.stock < 10 %}bg-danger{% elif product.stock < 50 %}bg-warning{% else %}bg-success{% endif %} fs-6">
                                 {{ product.stock }}

@@ -217,6 +217,75 @@ class OrderService:
             raise e
 
     @staticmethod
+    def edit_order(order_id, data, current_user):
+        """Edit an existing order that is not yet approved"""
+        try:
+            order = Order.query.get_or_404(order_id)
+            
+            # Validate that order can be edited
+            if order.approvalstatus:
+                return False, 'Cannot edit approved orders'
+            
+            if order.userid != current_user.id:
+                return False, 'You can only edit your own orders'
+            
+            # Update branch if changed
+            if data.get('branch_id') and int(data['branch_id']) != order.branchid:
+                order.branchid = int(data['branch_id'])
+            
+            # Clear existing order items
+            for item in order.order_items:
+                db.session.delete(item)
+            
+            # Add new order items
+            items_data = data.get('items', [])
+            total_amount = 0
+            
+            for item_data in items_data:
+                if not item_data.get('product_id') or not item_data.get('quantity'):
+                    raise ValueError('Product ID and quantity are required for each item')
+                
+                product = Product.query.get_or_404(int(item_data['product_id']))
+                quantity = int(item_data['quantity'])
+                
+                if quantity <= 0:
+                    raise ValueError(f'Invalid quantity for product {product.name}')
+                
+                # Check stock availability
+                if product.stock < quantity:
+                    raise ValueError(f'Insufficient stock for {product.name} (required: {quantity}, available: {product.stock})')
+                
+                # Calculate prices
+                original_price = float(product.sellingprice or 0)
+                negotiated_price = float(item_data.get('negotiated_price', original_price)) if item_data.get('negotiated_price') else None
+                final_price = negotiated_price if negotiated_price is not None else original_price
+                
+                item_total = quantity * final_price
+                total_amount += item_total
+                
+                # Create new order item
+                order_item = OrderItem(
+                    orderid=order.id,
+                    productid=product.id,
+                    quantity=quantity,
+                    original_price=original_price,
+                    negotiated_price=negotiated_price,
+                    final_price=final_price,
+                    negotiation_notes=item_data.get('negotiation_notes')
+                )
+                db.session.add(order_item)
+            
+            # Update order
+            order.updated_at = datetime.utcnow()
+            
+            db.session.commit()
+            return True, f'Order #{order.id} updated successfully'
+            
+        except Exception as e:
+            db.session.rollback()
+            return False, str(e)
+
+    @staticmethod
     def negotiate_price(order_item_id, new_price, notes, current_user):
         """Negotiate price for a specific order item"""
         try:
@@ -516,6 +585,33 @@ class AuthService:
         except Exception as e:
             db.session.rollback()
             raise e 
+
+    @staticmethod
+    def delete_order(order_id, current_user):
+        """Delete a pending order that is not yet approved"""
+        try:
+            order = Order.query.get_or_404(order_id)
+            
+            # Validate that order can be deleted
+            if order.approvalstatus:
+                return False, 'Cannot delete approved orders'
+            
+            if order.userid != current_user.id:
+                return False, 'You can only delete your own orders'
+            
+            # Delete all order items first
+            for item in order.order_items:
+                db.session.delete(item)
+            
+            # Delete the order
+            db.session.delete(order)
+            db.session.commit()
+            
+            return True, f'Order #{order_id} deleted successfully'
+            
+        except Exception as e:
+            db.session.rollback()
+            return False, str(e)
 
 class QuotationService:
     """Service class for quotation-related operations"""

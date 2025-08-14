@@ -1,6 +1,6 @@
-from flask import Flask, jsonify, request, render_template, redirect, url_for, flash, make_response
+from flask import Flask, jsonify, request, render_template, redirect, url_for, flash, send_file, Response
 from flask_login import login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash
 import json
 import os
 from datetime import datetime
@@ -9,8 +9,7 @@ from datetime import datetime
 from app import init_app, db, login_manager
 from app.models import *
 from app.decorators import sales_required
-from app.services import OrderService, PaymentService, StockService, AuthService, QuotationService
-from app.utils import create_invoice_for_order, create_receipt_for_payment
+from app.services import OrderService, StockService, AuthService, QuotationService
 
 # Import email service and config
 from email_service import get_email_service
@@ -58,188 +57,59 @@ def logout():
     flash('You have been logged out successfully.')
     return redirect(url_for('login'))
 
-# Forgot Password Routes
-@app.route("/forgot-password", methods=['GET', 'POST'])
-def forgot_password():
-    if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form.to_dict()
-        email = data.get('email')
-        
-        if not email:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': 'Email is required'})
-            flash('Email is required', 'danger')
-            return redirect(url_for('forgot_password'))
-        
-        try:
-            success, user, token = AuthService.send_password_reset(email)
-            
-            if success:
-                reset_url = url_for('reset_password', token=token, _external=True)
-                email_service = get_email_service()
-                
-                if email_service:
-                    email_result = email_service.send_password_reset_email(
-                        to_email=email,
-                        reset_url=reset_url,
-                        user_name=f"{user.firstname} {user.lastname}"
-                    )
-                    
-                    if email_result['success']:
-                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                            return jsonify({
-                                'success': True, 
-                                'message': f'Password reset link sent to {email}'
-                            })
-                        
-                        flash(f'Password reset link sent to {email}', 'success')
-                        return redirect(url_for('login'))
-                    else:
-                        # Email failed, but still show the link for testing
-                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                            return jsonify({
-                                'success': True, 
-                                'message': f'Password reset link sent to {email}. For testing, use this link: {reset_url}'
-                            })
-                        
-                        flash(f'Password reset link sent to {email}. For testing, use this link: {reset_url}', 'success')
-                        return redirect(url_for('login'))
-                else:
-                    # Email service not available, show link for testing
-                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        return jsonify({
-                            'success': True, 
-                            'message': f'Password reset link sent to {email}. For testing, use this link: {reset_url}'
-                        })
-                    
-                    flash(f'Password reset link sent to {email}. For testing, use this link: {reset_url}', 'success')
-                    return redirect(url_for('login'))
-            else:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': False, 'message': user})
-                flash(user, 'danger')
-                return redirect(url_for('forgot_password'))
-                
-        except Exception as e:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': f'Error: {str(e)}'})
-            flash(f'Error: {str(e)}', 'danger')
-            return redirect(url_for('forgot_password'))
-    
-    return render_template('forgot_password.html')
-
-@app.route("/reset-password/<token>", methods=['GET', 'POST'])
-def reset_password(token):
-    if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form.to_dict()
-        new_password = data.get('new_password')
-        confirm_password = data.get('confirm_password')
-        
-        if not new_password or not confirm_password:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': 'Both password fields are required'})
-            flash('Both password fields are required', 'danger')
-            return redirect(url_for('reset_password', token=token))
-        
-        if new_password != confirm_password:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': 'Passwords do not match'})
-            flash('Passwords do not match', 'danger')
-            return redirect(url_for('reset_password', token=token))
-        
-        if len(new_password) < 6:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': 'Password must be at least 6 characters long'})
-            flash('Password must be at least 6 characters long', 'danger')
-            return redirect(url_for('reset_password', token=token))
-        
-        try:
-            success, message = AuthService.reset_password(token, new_password)
-            
-            if success:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': True, 'message': f'{message}. A confirmation email has been sent to your email address.'})
-                
-                flash(f'{message}. A confirmation email has been sent to your email address.', 'success')
-                return redirect(url_for('login'))
-            else:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': False, 'message': message})
-                flash(message, 'danger')
-                return redirect(url_for('reset_password', token=token))
-                
-        except Exception as e:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': f'Error resetting password: {str(e)}'})
-            flash(f'Error resetting password: {str(e)}', 'danger')
-            return redirect(url_for('reset_password', token=token))
-    
-    return render_template('reset_password.html', token=token)
-
 # Dashboard
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    # Get summary statistics
+    # Get summary statistics for walk-in orders only
     
-    # Calculate revenue from walk-in orders created by current user
     # Get all walk-in orders created by current user
     walk_in_orders = Order.query.join(OrderType).filter(
         OrderType.name.ilike('%walk%'),  # Match any order type containing 'walk'
         Order.userid == current_user.id
     ).all()
     
-    # Get all completed payments for these orders
-    walk_in_order_ids = [order.id for order in walk_in_orders]
+    # Calculate total revenue from APPROVED walk-in orders only
     total_revenue = 0
-    if walk_in_order_ids:
-        # Use the raw decimal sum without converting to float to avoid rounding issues
-        revenue_sum = Payment.query.filter(
-            Payment.orderid.in_(walk_in_order_ids),
-            Payment.payment_status == 'completed'
-        ).with_entities(db.func.sum(Payment.amount)).scalar()
-        
-        # Convert to float only for display, but keep the precision
-        total_revenue = float(revenue_sum) if revenue_sum is not None else 0.0
+    for order in walk_in_orders:
+        if order.approvalstatus:  # Only count approved orders
+            for item in order.order_items:
+                if item.final_price is not None:
+                    total_revenue += item.quantity * float(item.final_price)
+                elif item.product.sellingprice is not None:
+                    total_revenue += item.quantity * float(item.product.sellingprice)
     
     stats = {
-        'total_orders': Order.query.count(),
-        'pending_orders': Order.query.filter_by(approvalstatus=False).count(),
+        'total_orders': len(walk_in_orders),
+        'pending_orders': len([o for o in walk_in_orders if not o.approvalstatus]),
         'total_revenue': total_revenue,
-        'pending_payments': Payment.query.filter_by(payment_status='pending').count()
+        'completed_orders': len([o for o in walk_in_orders if o.approvalstatus])
     }
     
-    # Get recent orders
-    recent_orders = Order.query.order_by(Order.created_at.desc()).limit(5).all()
+    # Get recent walk-in orders
+    recent_orders = walk_in_orders[:5]  # Get first 5 orders
     recent_orders_data = []
     for order in recent_orders:
+        # Calculate total amount for this order
+        total_amount = 0
+        for item in order.order_items:
+            if item.final_price is not None:
+                total_amount += item.quantity * float(item.final_price)
+            elif item.product.sellingprice is not None:
+                total_amount += item.quantity * float(item.product.sellingprice)
+        
         recent_orders_data.append({
             'id': order.id,
             'customer_name': f"{order.user.firstname} {order.user.lastname}",
             'status': 'Approved' if order.approvalstatus else 'Pending',
-            'payment_status': order.payment_status,
-            'created_at': order.created_at.strftime('%Y-%m-%d %H:%M')
-        })
-    
-    # Get recent payments
-    recent_payments = Payment.query.order_by(Payment.created_at.desc()).limit(5).all()
-    recent_payments_data = []
-    for payment in recent_payments:
-        recent_payments_data.append({
-            'id': payment.id,
-            'order_id': payment.orderid,
-            'customer_name': f"{payment.user.firstname} {payment.user.lastname}",
-            'amount': float(payment.amount),
-            'payment_method': payment.payment_method,
-            'status': payment.payment_status,
-            'created_at': payment.created_at.strftime('%Y-%m-%d %H:%M')
+            'created_at': order.created_at.strftime('%Y-%m-%d %H:%M'),
+            'total_amount': total_amount
         })
     
     return render_template('dashboard.html', 
                          user=current_user, 
                          stats=stats, 
-                         recent_orders=recent_orders_data,
-                         recent_payments=recent_payments_data)
+                         recent_orders=recent_orders_data)
 
 # Order Management Routes
 @app.route("/orders")
@@ -247,100 +117,42 @@ def dashboard():
 def orders_page():
     page = request.args.get('page', 1, type=int)
     status = request.args.get('status', '')
-    order_type = request.args.get('order_type', '')
     per_page = 20
 
-    # Debug: Print the order_type value
-    print(f"DEBUG: order_type = '{order_type}'")
-
-    # Filtering logic
-    if order_type and order_type.strip():  # Check if order_type is not empty or just whitespace
-        # Apply status filter first, then join with OrderType
-        query = Order.query
-        if status == 'pending':
-            query = query.filter_by(approvalstatus=False)
-        elif status == 'approved':
-            query = query.filter_by(approvalstatus=True)
-        
-        # Then join with OrderType and filter by order type (case-insensitive)
-        query = query.join(OrderType).filter(OrderType.name.ilike(order_type))
-        
-        # For walk-in orders, only show orders created by current user
-        if order_type.lower() in ['walk-in', 'walkin', 'walk in']:
-            query = query.filter(Order.userid == current_user.id)
-        
-        orders = query.order_by(Order.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
-        orders_list = orders.items
-        total = orders.total
-        pages = orders.pages
-    else:
-        # No filter: show all orders for current user or all orders for admin
-        query = Order.query
-        
-        # Apply status filters
-        if status == 'pending':
-            query = query.filter_by(approvalstatus=False)
-        elif status == 'approved':
-            query = query.filter_by(approvalstatus=True)
-        
-        # For non-admin users, show all online orders + their own walk-in orders
-        if current_user.role != 'admin':
-            # Get all online orders
-            online_orders = query.join(OrderType).filter(
-                OrderType.name.ilike('%online%')
-            ).all()
-            
-            # Get walk-in orders created by current user
-            walk_in_orders = query.join(OrderType).filter(
-                OrderType.name.ilike('%walk%'),
-                Order.userid == current_user.id
-            ).all()
-            
-            # Combine and sort
-            combined_orders = online_orders + walk_in_orders
-            combined_orders = list({o.id: o for o in combined_orders}.values())  # Remove duplicates
-            combined_orders.sort(key=lambda o: o.created_at, reverse=True)
-            
-            # Manual pagination
-            total = len(combined_orders)
-            pages = (total + per_page - 1) // per_page
-            start = (page - 1) * per_page
-            end = start + per_page
-            orders_list = combined_orders[start:end]
-            
-            # Debug: Print counts
-            print(f"DEBUG: User role = {current_user.role}")
-            print(f"DEBUG: User ID = {current_user.id}")
-            print(f"DEBUG: online_orders count = {len(online_orders)}")
-            print(f"DEBUG: walk_in_orders count = {len(walk_in_orders)}")
-            print(f"DEBUG: Total orders found = {total}")
-            print(f"DEBUG: Orders on current page = {len(orders_list)}")
-        else:
-            # For admin users, show all orders
-            orders = query.order_by(Order.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
-            orders_list = orders.items
-            total = orders.total
-            pages = orders.pages
-            
-            # Debug: Print counts
-            print(f"DEBUG: User role = {current_user.role}")
-            print(f"DEBUG: Total orders found = {total}")
-            print(f"DEBUG: Orders on current page = {len(orders_list)}")
-        
-        class Pagination:
-            def __init__(self, items, page, per_page, total, pages):
-                self.items = items
-                self.page = page
-                self.per_page = per_page
-                self.total = total
-                self.pages = pages
-                self.has_prev = page > 1
-                self.has_next = page < pages
-                self.prev_num = page - 1
-                self.next_num = page + 1
-            def iter_pages(self):
-                return range(1, self.pages + 1)
-        orders = Pagination(orders_list, page, per_page, total, pages)
+    # Only show walk-in orders for the current user
+    query = Order.query.join(OrderType).filter(
+        OrderType.name.ilike('%walk%'),
+        Order.userid == current_user.id
+    )
+    
+    # Apply status filters - be explicit about which table we're filtering
+    if status == 'pending':
+        query = query.filter(Order.approvalstatus == False)
+    elif status == 'approved':
+        query = query.filter(Order.approvalstatus == True)
+    
+    # Manual pagination for walk-in orders
+    total = query.count()
+    pages = (total + per_page - 1) // per_page
+    start = (page - 1) * per_page
+    end = start + per_page
+    orders_list = query.order_by(Order.created_at.desc()).offset(start).limit(per_page).all()
+    
+    class Pagination:
+        def __init__(self, items, page, per_page, total, pages):
+            self.items = items
+            self.page = page
+            self.per_page = per_page
+            self.total = total
+            self.pages = pages
+            self.has_prev = page > 1
+            self.has_next = page < pages
+            self.prev_num = page - 1
+            self.next_num = page + 1
+        def iter_pages(self):
+            return range(1, self.pages + 1)
+    
+    orders = Pagination(orders_list, page, per_page, total, pages)
 
     orders_data = []
     for order in orders_list:
@@ -365,7 +177,7 @@ def orders_page():
         })
 
     # Get filter options
-    order_types = OrderType.query.all()
+    order_types = OrderType.query.filter(OrderType.name.ilike('%walk%')).all()
     branches = Branch.query.all()
 
     return render_template('orders.html',
@@ -374,13 +186,18 @@ def orders_page():
                          pagination=orders,
                          order_types=order_types,
                          branches=branches,
-                         current_status=status,
-                         current_order_type=order_type)
+                         current_status=status)
 
 @app.route("/orders/<int:order_id>")
 @login_required
 def order_detail(order_id):
     order = Order.query.get_or_404(order_id)
+    
+    # Only allow access to walk-in orders created by current user
+    if not order.ordertype.name.lower().startswith('walk') or order.userid != current_user.id:
+        flash('Access denied. You can only view your own walk-in orders.', 'danger')
+        return redirect(url_for('orders_page'))
+    
     order_data = {
         'id': order.id,
         'customer_name': f"{order.user.firstname} {order.user.lastname}",
@@ -388,7 +205,6 @@ def order_detail(order_id):
         'order_type': order.ordertype.name,
         'branch': order.branch.name,
         'status': 'Approved' if order.approvalstatus else 'Pending',
-        'payment_status': order.payment_status,
         'created_at': order.created_at.strftime('%Y-%m-%d %H:%M'),
         'approved_at': order.approved_at.strftime('%Y-%m-%d %H:%M') if order.approved_at else None,
         'order_items': []
@@ -405,20 +221,6 @@ def order_detail(order_id):
             final_price = 0.0  # Fallback to zero if no price available
         item_total = item.quantity * final_price
         total_amount += item_total
-        
-        # For online orders, get the fulfillment branch information from stock transactions
-        fulfillment_branch = None
-        if 'online' in order.ordertype.name.lower() and order.approvalstatus:
-            # Find the stock transaction for this item to see which branch was used
-            stock_transaction = StockTransaction.query.filter(
-                StockTransaction.notes.like(f'Order #{order.id} approved%'),
-                StockTransaction.quantity == item.quantity
-            ).first()
-            
-            if stock_transaction:
-                product_used = Product.query.get(stock_transaction.productid)
-                if product_used:
-                    fulfillment_branch = product_used.branch.name
         
         # Handle original price
         if item.original_price is not None:
@@ -443,108 +245,181 @@ def order_detail(order_id):
             'original_price': original_price,
             'negotiated_price': float(item.negotiated_price) if item.negotiated_price else None,
             'final_price': display_final_price,
-            'total': item_total,
-            'fulfillment_branch': fulfillment_branch
+            'total': item_total
         })
     
     order_data['total_amount'] = total_amount
     
     return render_template('order_detail.html', 
-                         user=current_user, 
-                         order=order_data)
+                          user=current_user, 
+                          order=order_data)
 
-@app.route("/orders/<int:order_id>/select-branch", methods=['GET'])
+@app.route("/orders/<int:order_id>/invoice")
 @login_required
-def select_fulfillment_branch(order_id):
-    """Show branch selection page for online order approval"""
+def view_order_invoice(order_id):
+    """Generate PDF invoice for a specific order"""
+    from app.pdf_utils import create_receipt_pdf, generate_receipt_filename
+    import tempfile
+    import os
+    
     order = Order.query.get_or_404(order_id)
     
-    # Only allow branch selection for online orders that are not yet approved
-    if 'online' not in order.ordertype.name.lower() or order.approvalstatus:
-        flash('Branch selection is only available for pending online orders', 'warning')
-        return redirect(url_for('order_detail', order_id=order_id))
+    # Only allow access to walk-in orders created by current user
+    if not order.ordertype.name.lower().startswith('walk') or order.userid != current_user.id:
+        flash('Access denied. You can only view invoices for your own walk-in orders.', 'danger')
+        return redirect(url_for('orders_page'))
     
-    # Get all branches
-    branches = Branch.query.all()
+    # Prepare invoice data
+    invoice_data = {
+        'invoice_number': f"INV-{order.id:06d}",
+        'order_id': order.id,
+        'customer_name': f"{order.user.firstname} {order.user.lastname}",
+        'customer_email': order.user.email,
+        'customer_phone': order.user.phone if hasattr(order.user, 'phone') else 'N/A',
+        'branch': order.branch.name,
+        'order_date': order.created_at.strftime('%B %d, %Y'),
+        'order_time': order.created_at.strftime('%I:%M %p'),
+        'order_items': [],
+        'subtotal': 0
+    }
     
-    # For each order item, get stock information from all branches
-    order_items_with_branches = []
-    
+    # Calculate totals and prepare items
     for item in order.order_items:
-        item_branches = []
+        # Use final_price for calculations (includes negotiated prices)
+        if item.final_price is not None:
+            final_price = float(item.final_price)
+        elif item.product.sellingprice is not None:
+            final_price = float(item.product.sellingprice)
+        else:
+            final_price = 0.0
         
-        for branch in branches:
-            # Check if this product exists in this branch
-            product_in_branch = Product.query.filter_by(
-                productcode=item.product.productcode,
-                branchid=branch.id
-            ).first()
-            
-            if product_in_branch:
-                available_stock = product_in_branch.stock
-                is_sufficient = available_stock >= item.quantity
-            else:
-                available_stock = 0
-                is_sufficient = False
-            
-            item_branches.append({
-                'branch': branch,
-                'available_stock': available_stock,
-                'is_sufficient': is_sufficient,
-                'product_in_branch': product_in_branch
-            })
+        item_total = item.quantity * final_price
+        invoice_data['subtotal'] += item_total
         
-        order_items_with_branches.append({
-            'item': item,
-            'branches': item_branches
+        invoice_data['order_items'].append({
+            'product_name': item.product.name,
+            'quantity': item.quantity,
+            'unit_price': final_price,
+            'total': item_total
         })
     
-    return render_template('select_branch.html',
-                         user=current_user,
-                         order=order,
-                         order_items_with_branches=order_items_with_branches)
-
-@app.route("/orders/<int:order_id>/approve", methods=['POST'])
-@login_required
-@sales_required
-def approve_order(order_id):
+    # Prepare user data
+    user_data = {
+        'firstname': current_user.firstname,
+        'lastname': current_user.lastname,
+        'email': current_user.email
+    }
+    
     try:
-        # Get the branch selections from the request
-        data = request.get_json() if request.is_json else request.form.to_dict()
-        item_branch_selections = data.get('item_branch_selections', {})
+        # Create temporary file for PDF
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+            pdf_path = tmp_file.name
         
-        success, message = OrderService.approve_order(order_id, current_user, item_branch_selections)
+        # Generate PDF
+        create_receipt_pdf(invoice_data, user_data, pdf_path)
         
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': success, 'message': message})
-        
-        flash(message, 'success' if success else 'info')
-        return redirect(url_for('orders_page'))
+        # Return PDF file
+        return send_file(
+            pdf_path,
+            as_attachment=True,
+            download_name=f"receipt_INV-{order.id:06d}.pdf",
+            mimetype='application/pdf'
+        )
         
     except Exception as e:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'message': str(e)})
-        flash(f'Error: {str(e)}', 'danger')
+        flash(f'Error generating PDF: {str(e)}', 'danger')
         return redirect(url_for('orders_page'))
+    
+    finally:
+        # Clean up temporary file
+        if 'pdf_path' in locals() and os.path.exists(pdf_path):
+            try:
+                os.unlink(pdf_path)
+            except:
+                pass
 
-@app.route("/orders/<int:order_id>/reject", methods=['POST'])
+@app.route("/orders/<int:order_id>/invoice/view")
 @login_required
-@sales_required
-def reject_order(order_id):
-    try:
-        success, message = OrderService.reject_order(order_id)
-        
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': success, 'message': message})
-        
-        flash(message, 'success')
+def view_order_invoice_browser(order_id):
+    """View PDF invoice in browser for a specific order"""
+    from app.pdf_utils import create_receipt_pdf
+    import tempfile
+    import os
+    
+    order = Order.query.get_or_404(order_id)
+    
+    # Only allow access to walk-in orders created by current user
+    if not order.ordertype.name.lower().startswith('walk') or order.userid != current_user.id:
+        flash('Access denied. You can only view invoices for your own walk-in orders.', 'danger')
         return redirect(url_for('orders_page'))
+    
+    # Prepare invoice data
+    invoice_data = {
+        'invoice_number': f"INV-{order.id:06d}",
+        'order_id': order.id,
+        'customer_name': f"{order.user.firstname} {order.user.lastname}",
+        'customer_email': order.user.email,
+        'customer_phone': order.user.phone if hasattr(order.user, 'phone') else 'N/A',
+        'branch': order.branch.name,
+        'order_date': order.created_at.strftime('%B %d, %Y'),
+        'order_time': order.created_at.strftime('%I:%M %p'),
+        'order_items': [],
+        'subtotal': 0
+    }
+    
+    # Calculate totals and prepare items
+    for item in order.order_items:
+        # Use final_price for calculations (includes negotiated prices)
+        if item.final_price is not None:
+            final_price = float(item.final_price)
+        elif item.product.sellingprice is not None:
+            final_price = float(item.product.sellingprice)
+        else:
+            final_price = 0.0
+        
+        item_total = item.quantity * final_price
+        invoice_data['subtotal'] += item_total
+        
+        invoice_data['order_items'].append({
+            'product_name': item.product.name,
+            'quantity': item.quantity,
+            'unit_price': final_price,
+            'total': item_total
+        })
+    
+    # Prepare user data
+    user_data = {
+        'firstname': current_user.firstname,
+        'lastname': current_user.lastname,
+        'email': current_user.email
+    }
+    
+    try:
+        # Create temporary file for PDF
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+            pdf_path = tmp_file.name
+        
+        # Generate PDF
+        create_receipt_pdf(invoice_data, user_data, pdf_path)
+        
+        # Return PDF file for browser viewing
+        return send_file(
+            pdf_path,
+            as_attachment=False,
+            mimetype='application/pdf'
+        )
         
     except Exception as e:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'message': str(e)})
-        flash(f'Error: {str(e)}', 'danger')
+        flash(f'Error generating PDF: {str(e)}', 'danger')
         return redirect(url_for('orders_page'))
+    
+    finally:
+        # Clean up temporary file
+        if 'pdf_path' in locals() and os.path.exists(pdf_path):
+            try:
+                os.unlink(pdf_path)
+            except:
+                pass
 
 # Order Creation
 @app.route("/orders/create", methods=['GET', 'POST'])
@@ -608,14 +483,159 @@ def create_order():
     
     branches = Branch.query.all()
     products = Product.query.filter_by(display=True).all()
-    categories = Category.query.all()
+    subcategories = SubCategory.query.all()
     
     return render_template('create_order.html',
                          user=current_user,
                          walk_in_order_type_id=walk_in_order_type.id,
                          branches=branches,
                          products=products,
-                         categories=categories)
+                         subcategories=subcategories)
+
+@app.route("/orders/<int:order_id>/edit", methods=['GET', 'POST'])
+@login_required
+def edit_order(order_id):
+    """Edit an order that is not yet approved"""
+    order = Order.query.get_or_404(order_id)
+    
+    # Only allow editing of pending walk-in orders created by current user
+    if not order.ordertype.name.lower().startswith('walk') or order.userid != current_user.id:
+        flash('Access denied. You can only edit your own pending walk-in orders.', 'danger')
+        return redirect(url_for('orders_page'))
+    
+    if order.approvalstatus:
+        flash('Cannot edit approved orders', 'warning')
+        return redirect(url_for('order_detail', order_id=order_id))
+    
+    if request.method == 'POST':
+        try:
+            # Handle both JSON and form data
+            if request.is_json:
+                data = request.get_json()
+            else:
+                data = request.form.to_dict()
+                # Convert items from string to list if it's form data
+                if 'items' in data and isinstance(data['items'], str):
+                    try:
+                        data['items'] = json.loads(data['items'])
+                    except json.JSONDecodeError:
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return jsonify({'success': False, 'message': 'Invalid items data format'})
+                        flash('Invalid items data format', 'danger')
+                        return redirect(url_for('edit_order', order_id=order_id))
+            
+            # Validate required fields
+            if not data.get('branch_id'):
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'success': False, 'message': 'Branch is required'})
+                flash('Branch is required', 'danger')
+                return redirect(url_for('edit_order', order_id=order_id))
+            
+            if not data.get('items') or len(data['items']) == 0:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'success': False, 'message': 'At least one item is required'})
+                flash('At least one item is required', 'danger')
+                return redirect(url_for('edit_order', order_id=order_id))
+            
+            success, message = OrderService.edit_order(order_id, data, current_user)
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': success, 'message': message})
+            
+            flash(message, 'success' if success else 'danger')
+            return redirect(url_for('order_detail', order_id=order_id))
+            
+        except Exception as e:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': str(e)})
+            flash(f'Error editing order: {str(e)}', 'danger')
+            return redirect(url_for('edit_order', order_id=order_id))
+    
+    # GET request - show edit form
+    # Get current order data
+    order_data = {
+        'id': order.id,
+        'branch_id': order.branchid,
+        'order_items': []
+    }
+    
+    for item in order.order_items:
+        order_data['order_items'].append({
+            'id': item.id,
+            'product_id': item.productid,
+            'product_name': item.product.name,
+            'quantity': item.quantity,
+            'price': item.product.sellingprice,
+            'negotiated_price': float(item.negotiated_price) if item.negotiated_price else None,
+            'negotiation_notes': item.negotiation_notes
+        })
+    
+    branches = Branch.query.all()
+    products = Product.query.filter_by(display=True).all()
+    subcategories = SubCategory.query.all()
+    
+    return render_template('edit_order.html',
+                         user=current_user,
+                         order=order_data,
+                         branches=branches,
+                         products=products,
+                         subcategories=subcategories)
+
+@app.route("/orders/<int:order_id>/delete", methods=['POST'])
+@login_required
+def delete_order(order_id):
+    """Delete a pending order that is not yet approved"""
+    try:
+        order = Order.query.get_or_404(order_id)
+        
+        # Only allow deletion of pending walk-in orders created by current user
+        if not order.ordertype.name.lower().startswith('walk') or order.userid != current_user.id:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': 'Access denied. You can only delete your own pending walk-in orders.'})
+            flash('Access denied. You can only delete your own pending walk-in orders.', 'danger')
+            return redirect(url_for('orders_page'))
+        
+        if order.approvalstatus:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': 'Cannot delete approved orders'})
+            flash('Cannot delete approved orders', 'warning')
+            return redirect(url_for('order_detail', order_id=order_id))
+        
+        # Delete order logic (implemented directly to avoid service issues)
+        try:
+            # Delete related invoices first
+            from app.models import Invoice
+            invoices = Invoice.query.filter_by(orderid=order.id).all()
+            for invoice in invoices:
+                db.session.delete(invoice)
+            
+            # Delete all order items first
+            for item in order.order_items:
+                db.session.delete(item)
+            
+            # Delete the order
+            db.session.delete(order)
+            db.session.commit()
+            
+            message = f'Order #{order_id} deleted successfully'
+            success = True
+            
+        except Exception as e:
+            db.session.rollback()
+            message = f'Error deleting order: {str(e)}'
+            success = False
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': success, 'message': message})
+        
+        flash(message, 'success' if success else 'danger')
+        return redirect(url_for('orders_page'))
+        
+    except Exception as e:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': str(e)})
+        flash(f'Error deleting order: {str(e)}', 'danger')
+        return redirect(url_for('orders_page'))
 
 # Product Management Routes
 @app.route("/products")
@@ -629,7 +649,7 @@ def products_page():
     query = Product.query
     
     if category:
-        query = query.join(Category).filter(Category.name == category)
+        query = query.join(SubCategory).join(Category).filter(Category.name == category)
     if branch:
         query = query.join(Branch).filter(Branch.name == branch)
     if search:
@@ -639,10 +659,13 @@ def products_page():
     
     products_data = []
     for product in products.items:
+        # Get category name through subcategory relationship
+        category_name = product.sub_category.category.name if product.sub_category and product.sub_category.category else 'Uncategorized'
+        
         products_data.append({
             'id': product.id,
             'name': product.name,
-            'category': product.category.name,
+            'category': category_name,
             'branch': product.branch.name,
             'buying_price': product.buyingprice,
             'selling_price': product.sellingprice,
@@ -653,18 +676,98 @@ def products_page():
         })
     
     # Get filter options
-    categories = Category.query.all()
+    subcategories = SubCategory.query.all()
     branches = Branch.query.all()
     
     return render_template('products.html', 
                          user=current_user, 
                          products=products_data,
                          pagination=products,
-                         categories=categories,
+                         subcategories=subcategories,
                          branches=branches,
                          current_category=category,
                          current_branch=branch,
                          current_search=search)
+
+@app.route("/products/export")
+@login_required
+def export_products():
+    """Export products to CSV"""
+    import csv
+    from io import StringIO
+    
+    # Get filter parameters
+    category = request.args.get('category', '')
+    branch = request.args.get('branch', '')
+    search = request.args.get('search', '')
+    
+    # Build query with same filters as products page
+    query = Product.query
+    
+    if category:
+        query = query.join(SubCategory).join(Category).filter(Category.name == category)
+    if branch:
+        query = query.join(Branch).filter(Branch.name == branch)
+    if search:
+        query = query.filter(Product.name.ilike(f'%{search}%'))
+    
+    # Get all products (no pagination for export)
+    products = query.all()
+    
+    # Create CSV data
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # Write header
+    writer.writerow(['ID', 'Name', 'Product Code', 'Category', 'Branch', 'Buying Price', 'Selling Price', 'Stock', 'Status'])
+    
+    # Write data rows
+    for product in products:
+        category_name = product.sub_category.category.name if product.sub_category and product.sub_category.category else 'Uncategorized'
+        status = 'Active' if product.display else 'Hidden'
+        
+        writer.writerow([
+            product.id,
+            product.name,
+            product.productcode or '',
+            category_name,
+            product.branch.name,
+            product.buyingprice or 0,
+            product.sellingprice or 0,
+            product.stock or 0,
+            status
+        ])
+    
+    # Prepare response
+    output.seek(0)
+    
+    # Generate filename with timestamp
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"products_export_{timestamp}.csv"
+    
+    # Create temporary file
+    import tempfile
+    import os
+    
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', encoding='utf-8') as tmp_file:
+            tmp_file.write(output.getvalue())
+            tmp_file_path = tmp_file.name
+        
+        return send_file(
+            tmp_file_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='text/csv'
+        )
+    finally:
+        # Clean up temporary file after sending
+        if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
+            try:
+                os.unlink(tmp_file_path)
+            except:
+                pass
 
 @app.route("/products/<int:product_id>/edit", methods=['GET', 'POST'])
 @login_required
@@ -674,7 +777,7 @@ def edit_product(product_id):
     if request.method == 'POST':
         try:
             product.name = request.form['name']
-            product.categoryid = int(request.form['category_id'])
+            product.subcategory_id = int(request.form['category_id'])
             product.branchid = int(request.form['branch_id'])
             product.buyingprice = int(request.form['buying_price'])
             product.sellingprice = int(request.form['selling_price'])
@@ -690,13 +793,13 @@ def edit_product(product_id):
         except Exception as e:
             flash(f'Error updating product: {str(e)}', 'danger')
     
-    categories = Category.query.all()
+    subcategories = SubCategory.query.all()
     branches = Branch.query.all()
     
     return render_template('edit_product.html',
                          user=current_user,
                          product=product,
-                         categories=categories,
+                         subcategories=subcategories,
                          branches=branches)
 
 # Stock Management Routes
@@ -797,7 +900,7 @@ def api_products():
     query = Product.query.filter_by(display=True)
     
     if category_id:
-        query = query.filter_by(categoryid=category_id)
+        query = query.filter_by(subcategory_id=category_id)
     if branch_id:
         query = query.filter_by(branchid=branch_id)
     
@@ -841,524 +944,336 @@ def get_order_types():
         'name': ot.name
     } for ot in order_types])
 
-@app.route("/test")
-def test():
-    return render_template('test.html', test_data={'items': [1, 2, 3]})
-
 @app.route("/")
 def index():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
 
-# Payment Management Routes
-@app.route("/payments")
+# Quotation Management Routes
+@app.route("/quotations")
 @login_required
-def payments_page():
+def quotations_page():
+    """List all quotations"""
     page = request.args.get('page', 1, type=int)
     status = request.args.get('status', '')
-    payment_method = request.args.get('payment_method', '')
+    search = request.args.get('search', '')
     
-    query = Payment.query
+    query = Quotation.query
     
     if status:
-        query = query.filter_by(payment_status=status)
-    if payment_method:
-        query = query.filter_by(payment_method=payment_method)
+        query = query.filter_by(status=status)
+    if search:
+        query = query.filter(Quotation.customer_name.ilike(f'%{search}%'))
     
-    payments = query.order_by(Payment.created_at.desc()).paginate(
-        page=page, per_page=20, error_out=False
-    )
+    # For non-admin users, show only their quotations
+    if current_user.role != 'admin':
+        query = query.filter_by(created_by=current_user.id)
     
-    payments_data = []
-    for payment in payments.items:
-        payments_data.append({
-            'id': payment.id,
-            'order_id': payment.orderid,
-            'customer_name': f"{payment.user.firstname} {payment.user.lastname}",
-            'amount': float(payment.amount),
-            'payment_method': payment.payment_method,
-            'payment_status': payment.payment_status,
-            'reference_number': payment.reference_number,
-            'transaction_id': payment.transaction_id,
-            'payment_date': payment.payment_date.strftime('%Y-%m-%d %H:%M') if payment.payment_date else None,
-            'created_at': payment.created_at.strftime('%Y-%m-%d %H:%M')
-        })
+    quotations = query.order_by(Quotation.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
     
-    return render_template('payments.html',
+    return render_template('quotations.html',
                          user=current_user,
-                         payments=payments_data,
-                         pagination=payments,
+                         quotations=quotations.items,
+                         pagination=quotations,
                          current_status=status,
-                         current_payment_method=payment_method)
+                         current_search=search)
 
-@app.route("/orders/<int:order_id>/payment", methods=['GET', 'POST'])
+@app.route("/quotations/create", methods=['GET', 'POST'])
 @login_required
-def process_payment(order_id):
-    order = Order.query.get_or_404(order_id)
-    
+def create_quotation():
+    """Create a new quotation"""
     if request.method == 'POST':
         try:
-            data = request.get_json() if request.is_json else request.form.to_dict()
+            # Handle both JSON and form data
+            if request.is_json:
+                data = request.get_json()
+            else:
+                data = request.form.to_dict()
+                # Convert items from string to list if it's form data
+                if 'items' in data and isinstance(data['items'], str):
+                    try:
+                        data['items'] = json.loads(data['items'])
+                    except json.JSONDecodeError:
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return jsonify({'success': False, 'message': 'Invalid items data format'})
+                        flash('Invalid items data format', 'danger')
+                        return redirect(url_for('create_quotation'))
             
             # Validate required fields
-            if not data.get('amount') or not data.get('payment_method'):
+            if not data.get('customer_name') or not data.get('branch_id'):
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': False, 'message': 'Amount and payment method are required'})
-                flash('Amount and payment method are required', 'danger')
-                return redirect(url_for('process_payment', order_id=order_id))
+                    return jsonify({'success': False, 'message': 'Customer name and branch are required'})
+                flash('Customer name and branch are required', 'danger')
+                return redirect(url_for('create_quotation'))
             
-            success, payment_id, reference_number = PaymentService.process_payment(order_id, data, current_user)
+            if not data.get('items') or len(data['items']) == 0:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'success': False, 'message': 'At least one item is required'})
+                flash('At least one item is required', 'danger')
+                return redirect(url_for('create_quotation'))
+            
+            success, quotation_id, total_amount = QuotationService.create_quotation(data, current_user)
             
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({
                     'success': True,
-                    'payment_id': payment_id,
-                    'reference_number': reference_number,
-                    'message': 'Payment processed successfully'
+                    'quotation_id': quotation_id,
+                    'total_amount': total_amount,
+                    'message': 'Quotation created successfully'
                 })
             
-            flash(f'Payment processed successfully! Reference: {reference_number}', 'success')
-            return redirect(url_for('order_detail', order_id=order_id))
+            flash(f'Quotation created successfully! Quotation ID: {quotation_id}', 'success')
+            return redirect(url_for('quotation_detail', quotation_id=quotation_id))
             
         except Exception as e:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({'success': False, 'message': str(e)})
-            flash(f'Error processing payment: {str(e)}', 'danger')
-            return redirect(url_for('process_payment', order_id=order_id))
+            flash(f'Error creating quotation: {str(e)}', 'danger')
+            return redirect(url_for('create_quotation'))
     
-    # GET request - show payment form
-    # Calculate total amount
-    total_amount = sum(item.quantity * float(item.final_price) for item in order.order_items)
+    # GET request - show form
+    branches = Branch.query.all()
+    products = Product.query.filter_by(display=True).all()
+    subcategories = SubCategory.query.all()
     
-    # Get payment history for this order
-    payment_history = Payment.query.filter_by(orderid=order.id).order_by(Payment.created_at.desc()).all()
-    
-    return render_template('process_payment.html',
+    return render_template('create_quotation.html',
                          user=current_user,
-                         order=order,
-                         total_amount=total_amount,
-                         payment_history=payment_history)
+                         branches=branches,
+                         products=products,
+                         subcategories=subcategories)
 
-@app.route("/payments/<int:payment_id>")
+@app.route("/quotations/<int:quotation_id>")
 @login_required
-def payment_detail(payment_id):
-    payment = Payment.query.get_or_404(payment_id)
+def quotation_detail(quotation_id):
+    """View quotation details"""
+    quotation = Quotation.query.get_or_404(quotation_id)
     
-    payment_data = {
-        'id': payment.id,
-        'order_id': payment.orderid,
-        'customer_name': f"{payment.user.firstname} {payment.user.lastname}",
-        'amount': float(payment.amount),
-        'payment_method': payment.payment_method,
-        'payment_status': payment.payment_status,
-        'reference_number': payment.reference_number,
-        'transaction_id': payment.transaction_id,
-        'notes': payment.notes,
-        'payment_date': payment.payment_date.strftime('%Y-%m-%d %H:%M') if payment.payment_date else None,
-        'created_at': payment.created_at.strftime('%Y-%m-%d %H:%M')
-    }
+    # Check if user has access to this quotation
+    if current_user.role != 'admin' and quotation.created_by != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('quotations_page'))
     
-    return render_template('payment_detail.html',
+    return render_template('quotation_detail.html',
                          user=current_user,
-                         payment=payment_data)
+                         quotation=quotation)
 
-@app.route("/payments/<int:payment_id>/refund", methods=['POST'])
+@app.route("/quotations/<int:quotation_id>/pdf")
 @login_required
-def refund_payment(payment_id):
-    payment = Payment.query.get_or_404(payment_id)
+def view_quotation_pdf(quotation_id):
+    """View quotation PDF in browser"""
+    quotation = Quotation.query.get_or_404(quotation_id)
     
-    if payment.payment_status != 'completed':
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'message': 'Only completed payments can be refunded'})
-        flash('Only completed payments can be refunded', 'danger')
-        return redirect(url_for('payment_detail', payment_id=payment_id))
+    # Check if user has access to this quotation
+    if current_user.role != 'admin' and quotation.created_by != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('quotations_page'))
+    
+    # Generate PDF for quotation
+    from app.pdf_utils import create_quotation_pdf
+    import tempfile
+    import os
     
     try:
-        # Update payment status
-        payment.payment_status = 'refunded'
-        payment.updated_at = datetime.utcnow()
+        # Create temporary file for PDF
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+            pdf_path = tmp_file.name
         
-        # Update order payment status
-        order = payment.order
-        order.payment_status = 'refunded'
+        # Generate PDF
+        create_quotation_pdf(quotation, current_user, pdf_path)
+        
+        # Return PDF file for browser viewing
+        return send_file(
+            pdf_path,
+            as_attachment=False,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'danger')
+        return redirect(url_for('quotation_detail', quotation_id=quotation_id))
+    
+    finally:
+        # Clean up temporary file
+        if 'pdf_path' in locals() and os.path.exists(pdf_path):
+            try:
+                os.unlink(pdf_path)
+            except:
+                pass
+
+@app.route("/quotations/<int:quotation_id>/pdf/download")
+@login_required
+def download_quotation_pdf(quotation_id):
+    """Download quotation PDF"""
+    quotation = Quotation.query.get_or_404(quotation_id)
+    
+    # Check if user has access to this quotation
+    if current_user.role != 'admin' and quotation.created_by != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('quotations_page'))
+    
+    # Generate PDF for quotation
+    from app.pdf_utils import create_quotation_pdf
+    import tempfile
+    import os
+    
+    try:
+        # Create temporary file for PDF
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+            pdf_path = tmp_file.name
+        
+        # Generate PDF
+        create_quotation_pdf(quotation, current_user, pdf_path)
+        
+        # Return PDF file for download
+        return send_file(
+            pdf_path,
+            as_attachment=True,
+            download_name=f"quotation_{quotation.quotation_number}.pdf",
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Error generating PDF: {str(e)}', 'danger')
+        return redirect(url_for('quotation_detail', quotation_id=quotation_id))
+    
+    finally:
+        # Clean up temporary file
+        if 'pdf_path' in locals() and os.path.exists(pdf_path):
+            try:
+                os.unlink(pdf_path)
+            except:
+                pass
+
+@app.route("/quotations/<int:quotation_id>/status", methods=['POST'])
+@login_required
+def update_quotation_status(quotation_id):
+    """Update quotation status"""
+    quotation = Quotation.query.get_or_404(quotation_id)
+    
+    # Check if user has access to this quotation
+    if current_user.role != 'admin' and quotation.created_by != current_user.id:
+        return jsonify({'success': False, 'message': 'Access denied'}), 403
+    
+    try:
+        data = request.get_json()
+        new_status = data.get('status')
+        
+        if new_status not in ['pending', 'accepted', 'rejected', 'expired']:
+            return jsonify({'success': False, 'message': 'Invalid status'}), 400
+        
+        # Update status
+        quotation.status = new_status
+        quotation.updated_at = datetime.utcnow()
         
         db.session.commit()
         
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': True, 'message': 'Payment refunded successfully'})
-        
-        flash('Payment refunded successfully', 'success')
-        return redirect(url_for('payment_detail', payment_id=payment_id))
+        return jsonify({
+            'success': True, 
+            'message': f'Status updated to {new_status.title()}'
+        })
         
     except Exception as e:
         db.session.rollback()
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'message': str(e)})
-        flash(f'Error refunding payment: {str(e)}', 'danger')
-        return redirect(url_for('payment_detail', payment_id=payment_id))
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-# API Routes for payments
-@app.route("/api/payment-methods")
+@app.route("/quotations/<int:quotation_id>/edit", methods=['GET', 'POST'])
 @login_required
-def get_payment_methods():
-    payment_methods = [
-        {'id': 'cash', 'name': 'Cash'},
-        {'id': 'card', 'name': 'Credit/Debit Card'},
-        {'id': 'mobile_money', 'name': 'Mobile Money'},
-        {'id': 'bank_transfer', 'name': 'Bank Transfer'}
-    ]
-    return jsonify(payment_methods)
-
-# Invoice and Receipt Routes
-@app.route("/invoices")
-@login_required
-def invoices_page():
-    page = request.args.get('page', 1, type=int)
-    status = request.args.get('status', '')
+def edit_quotation(quotation_id):
+    """Edit quotation"""
+    quotation = Quotation.query.get_or_404(quotation_id)
     
-    query = Invoice.query
+    # Check if user has access to this quotation
+    if current_user.role != 'admin' and quotation.created_by != current_user.id:
+        flash('Access denied', 'danger')
+        return redirect(url_for('quotations_page'))
     
-    if status:
-        query = query.filter_by(status=status)
+    if request.method == 'POST':
+        try:
+            # Update quotation details
+            quotation.customer_name = request.form.get('customer_name')
+            quotation.customer_email = request.form.get('customer_email')
+            quotation.customer_phone = request.form.get('customer_phone')
+            quotation.notes = request.form.get('notes')
+            quotation.valid_until = datetime.strptime(request.form.get('valid_until'), '%Y-%m-%d') if request.form.get('valid_until') else None
+            quotation.updated_at = datetime.utcnow()
+            
+            # Update items
+            item_ids = request.form.getlist('item_id[]')
+            quantities = request.form.getlist('quantity[]')
+            unit_prices = request.form.getlist('unit_price[]')
+            notes = request.form.getlist('notes[]')
+            
+            # Clear existing items
+            for item in quotation.items:
+                db.session.delete(item)
+            
+            # Add updated items
+            subtotal = 0
+            for i in range(len(item_ids)):
+                if item_ids[i] and quantities[i] and unit_prices[i]:
+                    quantity = int(quantities[i])
+                    unit_price = float(unit_prices[i])
+                    total_price = quantity * unit_price
+                    subtotal += total_price
+                    
+                    item = QuotationItem(
+                        quotation_id=quotation.id,
+                        product_id=int(item_ids[i]),
+                        quantity=quantity,
+                        unit_price=unit_price,
+                        total_price=total_price,
+                        notes=notes[i] if notes[i] else None
+                    )
+                    db.session.add(item)
+            
+            quotation.subtotal = subtotal
+            quotation.total_amount = subtotal
+            
+            db.session.commit()
+            flash('Quotation updated successfully!', 'success')
+            return redirect(url_for('quotation_detail', quotation_id=quotation.id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating quotation: {str(e)}', 'danger')
     
-    invoices = query.order_by(Invoice.created_at.desc()).paginate(
-        page=page, per_page=20, error_out=False
-    )
+    # GET request - show edit form
+    branches = Branch.query.all()
+    products = Product.query.filter_by(display=True).all()
+    subcategories = SubCategory.query.all()
     
-    invoices_data = []
-    for invoice in invoices.items:
-        invoices_data.append({
-            'id': invoice.id,
-            'invoice_number': invoice.invoice_number,
-            'order_id': invoice.orderid,
-            'customer_name': f"{invoice.order.user.firstname} {invoice.order.user.lastname}",
-            'total_amount': float(invoice.total_amount),
-            'status': invoice.status,
-            'due_date': invoice.due_date.strftime('%Y-%m-%d') if invoice.due_date else None,
-            'created_at': invoice.created_at.strftime('%Y-%m-%d %H:%M')
-        })
-    
-    return render_template('invoices.html',
+    return render_template('edit_quotation.html',
                          user=current_user,
-                         invoices=invoices_data,
-                         pagination=invoices,
-                         current_status=status)
+                         quotation=quotation,
+                         branches=branches,
+                         products=products,
+                         subcategories=subcategories)
 
-@app.route("/invoices/<int:invoice_id>")
+@app.route("/quotations/<int:quotation_id>/delete", methods=['POST'])
 @login_required
-def invoice_detail(invoice_id):
-    invoice = Invoice.query.get_or_404(invoice_id)
+def delete_quotation(quotation_id):
+    """Delete quotation"""
+    quotation = Quotation.query.get_or_404(quotation_id)
     
-    invoice_data = {
-        'id': invoice.id,
-        'invoice_number': invoice.invoice_number,
-        'order_id': invoice.orderid,
-        'customer_name': f"{invoice.order.user.firstname} {invoice.order.user.lastname}",
-        'customer_email': invoice.order.user.email,
-        'total_amount': float(invoice.total_amount),
-        'subtotal': float(invoice.subtotal),
-        'tax_amount': float(invoice.tax_amount),
-        'discount_amount': float(invoice.discount_amount),
-        'status': invoice.status,
-        'due_date': invoice.due_date.strftime('%Y-%m-%d') if invoice.due_date else None,
-        'notes': invoice.notes,
-        'created_at': invoice.created_at.strftime('%Y-%m-%d %H:%M'),
-        'order_items': []
-    }
+    # Check if user has access to this quotation
+    if current_user.role != 'admin' and quotation.created_by != current_user.id:
+        return jsonify({'success': False, 'message': 'Access denied'}), 403
     
-    # Get order items
-    for item in invoice.order.order_items:
-        item_total = item.quantity * float(item.final_price)
-        invoice_data['order_items'].append({
-            'product_name': item.product.name,
-            'quantity': item.quantity,
-            'price': float(item.final_price),
-            'total': item_total
-        })
-    
-    return render_template('invoice_detail.html',
-                         user=current_user,
-                         invoice=invoice_data)
-
-@app.route("/invoices/<int:invoice_id>/print")
-@login_required
-@sales_required
-def print_invoice(invoice_id):
-    """Print invoice PDF"""
     try:
-        invoice = Invoice.query.get_or_404(invoice_id)
+        # Delete all quotation items first
+        for item in quotation.items:
+            db.session.delete(item)
         
-        # Generate PDF
-        from app.pdf_utils import generate_invoice_pdf
-        pdf_buffer = generate_invoice_pdf(invoice.id)
+        # Delete the quotation
+        db.session.delete(quotation)
+        db.session.commit()
         
-        # Return PDF for printing
-        from flask import send_file
-        pdf_buffer.seek(0)
-        return send_file(
-            pdf_buffer,
-            as_attachment=False,  # This makes it view in browser
-            download_name=f"invoice_{invoice.invoice_number}.pdf",
-            mimetype='application/pdf'
-        )
+        return jsonify({'success': True, 'message': 'Quotation deleted successfully'})
         
     except Exception as e:
-        flash(f'Error generating PDF: {str(e)}', 'danger')
-        return redirect(url_for('invoice_detail', invoice_id=invoice_id))
-
-@app.route("/receipts")
-@login_required
-def receipts_page():
-    page = request.args.get('page', 1, type=int)
-    
-    receipts = Receipt.query.order_by(Receipt.created_at.desc()).paginate(
-        page=page, per_page=20, error_out=False
-    )
-    
-    receipts_data = []
-    for receipt in receipts.items:
-        receipts_data.append({
-            'id': receipt.id,
-            'receipt_number': receipt.receipt_number,
-            'order_id': receipt.orderid,
-            'customer_name': f"{receipt.order.user.firstname} {receipt.order.user.lastname}",
-            'payment_amount': float(receipt.payment_amount),
-            'previous_balance': float(receipt.previous_balance),
-            'remaining_balance': float(receipt.remaining_balance),
-            'payment_method': receipt.payment_method,
-            'reference_number': receipt.reference_number,
-            'created_at': receipt.created_at.strftime('%Y-%m-%d %H:%M')
-        })
-    
-    return render_template('receipts.html',
-                         user=current_user,
-                         receipts=receipts_data,
-                         pagination=receipts)
-
-@app.route("/receipts/<int:receipt_id>")
-@login_required
-def receipt_detail(receipt_id):
-    receipt = Receipt.query.get_or_404(receipt_id)
-    
-    # Pass the actual receipt object instead of converting to dictionary
-    # This allows the template to access receipt.order.order_items
-    return render_template('receipt_detail.html',
-                         user=current_user,
-                         receipt=receipt)
-
-@app.route("/receipts/<int:receipt_id>/print")
-@login_required
-@sales_required
-def print_receipt(receipt_id):
-    """Print receipt PDF"""
-    try:
-        receipt = Receipt.query.get_or_404(receipt_id)
-        
-        # Generate PDF
-        from app.pdf_utils import generate_receipt_pdf
-        pdf_buffer = generate_receipt_pdf(receipt.id)
-        
-        # Return PDF for printing
-        from flask import send_file
-        pdf_buffer.seek(0)
-        return send_file(
-            pdf_buffer,
-            as_attachment=False,  # This makes it view in browser
-            download_name=f"receipt_{receipt.receipt_number}.pdf",
-            mimetype='application/pdf'
-        )
-        
-    except Exception as e:
-        flash(f'Error generating PDF: {str(e)}', 'danger')
-        return redirect(url_for('receipt_detail', receipt_id=receipt_id))
-
-@app.route("/receipts/<int:receipt_id>/pdf")
-@login_required
-@sales_required
-def download_receipt_pdf(receipt_id):
-    """Generate and download PDF receipt"""
-    try:
-        receipt = Receipt.query.get_or_404(receipt_id)
-        
-        # Generate PDF
-        from app.pdf_utils import generate_receipt_pdf
-        pdf_buffer = generate_receipt_pdf(receipt.id)
-        
-        # Return PDF as download
-        from flask import send_file
-        pdf_buffer.seek(0)
-        return send_file(
-            pdf_buffer,
-            as_attachment=True,
-            download_name=f"receipt_{receipt.receipt_number}.pdf",
-            mimetype='application/pdf'
-        )
-        
-    except Exception as e:
-        flash(f'Error generating PDF: {str(e)}', 'danger')
-        return redirect(url_for('receipt_detail', receipt_id=receipt_id))
-
-@app.route("/receipts/<int:receipt_id>/view")
-@login_required
-@sales_required
-def view_receipt_pdf(receipt_id):
-    """View PDF receipt in the browser"""
-    try:
-        receipt = Receipt.query.get_or_404(receipt_id)
-        
-        # Generate PDF
-        from app.pdf_utils import generate_receipt_pdf
-        pdf_buffer = generate_receipt_pdf(receipt.id)
-        
-        # Return PDF for viewing in browser
-        from flask import send_file
-        pdf_buffer.seek(0)
-        return send_file(
-            pdf_buffer,
-            as_attachment=False,  # This makes it view in browser
-            download_name=f"receipt_{receipt.receipt_number}.pdf",
-            mimetype='application/pdf'
-        )
-        
-    except Exception as e:
-        flash(f'Error generating PDF: {str(e)}', 'danger')
-        return redirect(url_for('receipt_detail', receipt_id=receipt_id))
-
-@app.route("/receipts/<int:receipt_id>/email")
-@login_required
-@sales_required
-def send_receipt_email(receipt_id):
-    """Send receipt email with PDF attachment"""
-    try:
-        receipt = Receipt.query.get_or_404(receipt_id)
-        order = receipt.order
-        user = order.user
-        
-        # Generate PDF
-        from app.pdf_utils import generate_receipt_pdf
-        pdf_buffer = generate_receipt_pdf(receipt.id)
-        pdf_bytes = pdf_buffer.getvalue()
-        
-        # Send email
-        from email_service import get_email_service
-        email_service = get_email_service()
-        
-        if email_service:
-            result = email_service.send_receipt_email(
-                to_email=user.email,
-                user_name=f"{user.firstname} {user.lastname}",
-                order_id=order.id,
-                receipt_number=receipt.receipt_number,
-                payment_amount=float(receipt.payment_amount),
-                pdf_attachment=pdf_bytes
-            )
-            
-            if result.get('success'):
-                flash(f'Receipt email sent successfully to {user.email}', 'success')
-            else:
-                flash(f'Failed to send receipt email: {result.get("error")}', 'danger')
-        else:
-            flash('Email service not configured', 'warning')
-            
-    except Exception as e:
-        flash(f'Error sending receipt email: {str(e)}', 'danger')
-    
-    return redirect(url_for('receipt_detail', receipt_id=receipt_id))
-
-@app.route("/debug/send-receipt-email/<int:receipt_id>")
-@login_required
-@sales_required
-def debug_send_receipt_email(receipt_id):
-    """Debug route to manually send receipt email"""
-    try:
-        receipt = Receipt.query.get_or_404(receipt_id)
-        order = receipt.order
-        user = order.user
-        
-        # Generate PDF
-        from app.pdf_utils import generate_receipt_pdf
-        pdf_buffer = generate_receipt_pdf(receipt.id)
-        pdf_bytes = pdf_buffer.getvalue()
-        
-        # Send email
-        from email_service import get_email_service
-        email_service = get_email_service()
-        
-        if email_service:
-            result = email_service.send_receipt_email(
-                to_email=user.email,
-                user_name=f"{user.firstname} {user.lastname}",
-                order_id=order.id,
-                receipt_number=receipt.receipt_number,
-                payment_amount=float(receipt.payment_amount),
-                pdf_attachment=pdf_bytes
-            )
-            
-            if result.get('success'):
-                flash(f'Receipt email sent successfully to {user.email}', 'success')
-            else:
-                flash(f'Failed to send receipt email: {result.get("error")}', 'danger')
-        else:
-            flash('Email service not configured', 'warning')
-            
-    except Exception as e:
-        flash(f'Error sending receipt email: {str(e)}', 'danger')
-    
-    return redirect(url_for('receipt_detail', receipt_id=receipt_id))
-
-@app.route("/test-email")
-def test_email():
-    """Test route to verify email functionality"""
-    try:
-        from email_service import get_email_service
-        email_service = get_email_service()
-        
-        if email_service:
-            # Test password change alert
-            change_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
-            result = email_service.send_password_change_alert(
-                to_email="test@example.com",
-                user_name="Test User",
-                change_time=change_time
-            )
-            
-            if result['success']:
-                return jsonify({
-                    'success': True,
-                    'message': 'Test email sent successfully!',
-                    'message_id': result.get('message_id')
-                })
-            else:
-                return jsonify({
-                    'success': False,
-                    'message': f'Failed to send test email: {result.get("error", "Unknown error")}'
-                })
-        else:
-            return jsonify({
-                'success': False,
-                'message': 'Email service not available. Check your Brevo API key configuration.'
-            })
-            
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': f'Error testing email: {str(e)}'
-        })
-
-@app.route("/debug/order-types")
-@login_required
-def debug_order_types():
-    """Debug route to check order types in database"""
-    order_types = OrderType.query.all()
-    orders = Order.query.join(OrderType).all()
-    
-    debug_info = {
-        'order_types': [{'id': ot.id, 'name': ot.name} for ot in order_types],
-        'orders': [{'id': o.id, 'order_type': o.ordertype.name, 'user_id': o.userid} for o in orders]
-    }
-    
-    return jsonify(debug_info)
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route("/orders/<int:order_id>/negotiate", methods=['GET', 'POST'])
 @login_required
@@ -1366,7 +1281,11 @@ def negotiate_order_prices(order_id):
     """Show price negotiation page for an order"""
     order = Order.query.get_or_404(order_id)
     
-    # Only allow negotiation for pending orders
+    # Only allow negotiation for pending walk-in orders created by current user
+    if not order.ordertype.name.lower().startswith('walk') or order.userid != current_user.id:
+        flash('Access denied. You can only negotiate prices for your own pending walk-in orders.', 'danger')
+        return redirect(url_for('orders_page'))
+    
     if order.approvalstatus:
         flash('Cannot negotiate prices for approved orders', 'warning')
         return redirect(url_for('order_detail', order_id=order_id))
@@ -1454,795 +1373,6 @@ def negotiate_order_prices(order_id):
                          user=current_user,
                          order=order,
                          order_items=order_items_data)
-
-# Delivery Routes
-@app.route("/deliveries")
-@login_required
-def deliveries_page():
-    """List all deliveries with pagination"""
-    page = request.args.get('page', 1, type=int)
-    delivery_status = request.args.get('delivery_status', '')
-    payment_status = request.args.get('payment_status', '')
-    
-    query = Delivery.query.join(Order).order_by(Delivery.created_at.desc())
-    
-    if delivery_status:
-        query = query.filter(Delivery.delivery_status == delivery_status)
-    
-    if payment_status:
-        query = query.filter(Delivery.payment_status == payment_status)
-    
-    deliveries = query.paginate(page=page, per_page=20, error_out=False)
-    
-    return render_template('deliveries.html',
-                         user=current_user,
-                         deliveries=deliveries.items,
-                         pagination=deliveries,
-                         current_delivery_status=delivery_status,
-                         current_payment_status=payment_status)
-
-@app.route("/deliveries/create", methods=['GET', 'POST'])
-@login_required
-def create_delivery():
-    """Create a new delivery for an order"""
-    if request.method == 'POST':
-        try:
-            data = request.get_json() if request.is_json else request.form.to_dict()
-            order_id = data.get('order_id')
-            delivery_amount = data.get('delivery_amount')
-            delivery_location = data.get('delivery_location')
-            customer_phone = data.get('customer_phone')
-            agreed_delivery_time = data.get('agreed_delivery_time')
-            notes = data.get('notes', '')
-
-            # Get available orders for dropdown (use 'userid' instead of 'user_id')
-            available_orders = Order.query.filter_by(approvalstatus=True).all()
-            
-            # Filter out orders that already have deliveries
-            orders_without_deliveries = []
-            for order in available_orders:
-                existing_delivery = Delivery.query.filter_by(order_id=order.id).first()
-                if not existing_delivery:
-                    orders_without_deliveries.append(order)
-
-            # Build form dict from submitted data
-            form = {
-                'delivery_amount': delivery_amount or '',
-                'customer_phone': customer_phone or '',
-                'agreed_delivery_time': agreed_delivery_time or '',
-                'location': delivery_location or '',
-                'delivery_status': data.get('delivery_status', 'pending'),
-                'payment_status': data.get('payment_status', 'pending')
-            }
-
-            # Validate required fields
-            if not all([order_id, delivery_amount, delivery_location, customer_phone]):
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': False, 'message': 'All required fields must be filled'})
-                flash('All required fields must be filled', 'danger')
-                return render_template('create_delivery.html',
-                                      user=current_user,
-                                      order=None,
-                                      available_orders=orders_without_deliveries,
-                                      form=form,
-                                      selected_order_id=order_id)
-
-            # Check if order exists
-            order = Order.query.get(order_id)
-            if not order:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': False, 'message': 'Order not found'})
-                flash('Order not found', 'danger')
-                return render_template('create_delivery.html',
-                                      user=current_user,
-                                      order=None,
-                                      available_orders=orders_without_deliveries,
-                                      form=form,
-                                      selected_order_id=order_id)
-
-            # Check if delivery already exists for this order
-            existing_delivery = Delivery.query.filter_by(order_id=order_id).first()
-            if existing_delivery:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': False, 'message': 'Delivery already exists for this order'})
-                flash('Delivery already exists for this order', 'warning')
-                return redirect(url_for('delivery_detail', delivery_id=existing_delivery.id))
-
-            # Create delivery
-            delivery = Delivery(
-                order_id=order_id,
-                delivery_amount=delivery_amount,
-                delivery_location=delivery_location,
-                customer_phone=customer_phone,
-                agreed_delivery_time=datetime.strptime(agreed_delivery_time, '%Y-%m-%dT%H:%M') if agreed_delivery_time else None,
-                notes=notes
-            )
-
-            db.session.add(delivery)
-            db.session.commit()
-
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({
-                    'success': True, 
-                    'message': 'Delivery created successfully',
-                    'delivery_id': delivery.id
-                })
-
-            flash('Delivery created successfully', 'success')
-            return redirect(url_for('delivery_detail', delivery_id=delivery.id))
-
-        except Exception as e:
-            db.session.rollback()
-            # Get available orders for dropdown (use 'userid' instead of 'user_id')
-            available_orders = Order.query.filter_by(approvalstatus=True).all()
-            
-            # Filter out orders that already have deliveries
-            orders_without_deliveries = []
-            for order in available_orders:
-                existing_delivery = Delivery.query.filter_by(order_id=order.id).first()
-                if not existing_delivery:
-                    orders_without_deliveries.append(order)
-            # Build form dict from submitted data
-            form = {
-                'delivery_amount': request.form.get('delivery_amount', ''),
-                'customer_phone': request.form.get('customer_phone', ''),
-                'agreed_delivery_time': request.form.get('agreed_delivery_time', ''),
-                'location': request.form.get('delivery_location', ''),
-                'delivery_status': request.form.get('delivery_status', 'pending'),
-                'payment_status': request.form.get('payment_status', 'pending')
-            }
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': f'Error creating delivery: {str(e)}'})
-            flash(f'Error creating delivery: {str(e)}', 'danger')
-            return render_template('create_delivery.html',
-                                  user=current_user,
-                                  order=None,
-                                  available_orders=orders_without_deliveries,
-                                  form=form,
-                                  selected_order_id=request.form.get('order_id'))
-
-    # GET request - show create delivery form
-    order_id = request.args.get('order_id')
-    order = None
-    if order_id:
-        order = Order.query.get(order_id)
-
-    # Get available orders for delivery - show all approved orders that don't have deliveries yet
-    available_orders = Order.query.filter_by(approvalstatus=True).all()
-    
-    # Filter out orders that already have deliveries
-    orders_without_deliveries = []
-    for order in available_orders:
-        existing_delivery = Delivery.query.filter_by(order_id=order.id).first()
-        if not existing_delivery:
-            orders_without_deliveries.append(order)
-
-    # Initialize form data
-    form = {
-        'delivery_amount': '',
-        'customer_phone': '',
-        'agreed_delivery_time': '',
-        'location': '',
-        'delivery_status': 'pending',
-        'payment_status': 'pending'
-    }
-
-    return render_template('create_delivery.html',
-                         user=current_user,
-                         order=order,
-                         available_orders=orders_without_deliveries,
-                         form=form,
-                         selected_order_id=order_id)
-
-@app.route("/deliveries/<int:delivery_id>")
-@login_required
-def delivery_detail(delivery_id):
-    """View delivery details"""
-    delivery = Delivery.query.get_or_404(delivery_id)
-    
-    # Calculate order total
-    order_total = sum(float(item.final_price) * item.quantity for item in delivery.order.order_items)
-    
-    return render_template('delivery_detail.html',
-                         user=current_user,
-                         delivery=delivery,
-                         order_total=order_total)
-
-@app.route("/deliveries/<int:delivery_id>/update-status", methods=['POST'])
-@login_required
-def update_delivery_status(delivery_id):
-    """Update delivery status"""
-    delivery = Delivery.query.get_or_404(delivery_id)
-    
-    try:
-        data = request.get_json() if request.is_json else request.form.to_dict()
-        new_status = data.get('status')
-        
-        if not new_status:
-            return jsonify({'success': False, 'message': 'Status is required'})
-        
-        valid_statuses = ['pending', 'in_transit', 'delivered', 'cancelled', 'failed']
-        if new_status not in valid_statuses:
-            return jsonify({'success': False, 'message': 'Invalid status'})
-        
-        delivery.delivery_status = new_status
-        db.session.commit()
-        
-        return jsonify({
-            'success': True, 
-            'message': f'Delivery status updated to {new_status}'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': f'Error updating status: {str(e)}'})
-
-
-
-@app.route("/orders/<int:order_id>/delivery")
-@login_required
-def order_delivery(order_id):
-    """View delivery for a specific order"""
-    order = Order.query.get_or_404(order_id)
-    delivery = Delivery.query.filter_by(order_id=order_id).first()
-    
-    if not delivery:
-        flash('No delivery found for this order', 'info')
-        return redirect(url_for('create_delivery', order_id=order_id))
-    
-    delivery_data = {
-        'id': delivery.id,
-        'order_id': delivery.order_id,
-        'customer_name': f"{delivery.order.user.firstname} {delivery.order.user.lastname}",
-        'customer_email': delivery.order.user.email,
-        'customer_phone': delivery.customer_phone,
-        'delivery_location': delivery.delivery_location,
-        'delivery_amount': float(delivery.delivery_amount),
-        'delivery_status': delivery.delivery_status,
-        'payment_status': delivery.payment_status,
-        'agreed_delivery_time': delivery.agreed_delivery_time.strftime('%Y-%m-%d %H:%M') if delivery.agreed_delivery_time else None,
-        'notes': delivery.notes,
-        'created_at': delivery.created_at.strftime('%Y-%m-%d %H:%M'),
-        'updated_at': delivery.updated_at.strftime('%Y-%m-%d %H:%M')
-    }
-    
-    return render_template('order_delivery.html',
-                         user=current_user,
-                         order=order,
-                         delivery=delivery_data)
-
-@app.route("/api/orders/<int:order_id>")
-@login_required
-def api_order_detail(order_id):
-    """Get order details by ID for API calls"""
-    order = Order.query.get_or_404(order_id)
-    
-    # Check if user has permission to view this order
-    if order.userid != current_user.id:
-        return jsonify({'success': False, 'message': 'Access denied'})
-    
-    # Calculate total amount from order items
-    total_amount = sum(float(item.final_price) * item.quantity for item in order.order_items)
-    
-    order_data = {
-        'id': order.id,
-        'customer_name': f"{order.user.firstname} {order.user.lastname}",
-        'order_type': order.ordertype.name,
-        'branch': order.branch.name,
-        'status': 'Approved' if order.approvalstatus else 'Pending',
-        'total_amount': total_amount,
-        'created_at': order.created_at.strftime('%Y-%m-%d %H:%M'),
-        'customer_phone': getattr(order.user, 'phone', None)  # In case phone doesn't exist
-    }
-    
-    return jsonify({'success': True, 'order': order_data})
-
-# Delivery Payment Routes
-@app.route("/delivery-payments")
-@login_required
-def delivery_payments_page():
-    """List all delivery payments with pagination"""
-    page = request.args.get('page', 1, type=int)
-    payment_status = request.args.get('payment_status', '')
-    
-    query = DeliveryPayment.query.join(Delivery).join(Order).order_by(DeliveryPayment.created_at.desc())
-    
-    if payment_status:
-        query = query.filter(DeliveryPayment.payment_status == payment_status)
-    
-    payments = query.paginate(page=page, per_page=20, error_out=False)
-    
-    return render_template('delivery_payments.html',
-                         user=current_user,
-                         payments=payments.items,
-                         pagination=payments,
-                         current_payment_status=payment_status)
-
-@app.route("/delivery-payments/<int:payment_id>")
-@login_required
-def delivery_payment_detail(payment_id):
-    """View delivery payment details"""
-    payment = DeliveryPayment.query.get_or_404(payment_id)
-    
-    return render_template('delivery_payment_detail.html',
-                         user=current_user,
-                         payment=payment)
-
-@app.route("/deliveries/<int:delivery_id>/process-payment", methods=['GET', 'POST'])
-@login_required
-def process_delivery_payment_new(delivery_id):
-    """Process payment for delivery with new DeliveryPayment model"""
-    delivery = Delivery.query.get_or_404(delivery_id)
-    
-    if request.method == 'POST':
-        try:
-            data = request.get_json() if request.is_json else request.form.to_dict()
-            
-            payment_method = data.get('payment_method')
-            amount = data.get('amount')
-            notes = data.get('notes', '')
-            
-            if not all([payment_method, amount]):
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': False, 'message': 'Payment method and amount are required'})
-                flash('Payment method and amount are required', 'danger')
-                return redirect(url_for('process_delivery_payment_new', delivery_id=delivery_id))
-            
-            # Validate amount
-            if float(amount) != float(delivery.delivery_amount):
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': False, 'message': 'Payment amount must match delivery amount'})
-                flash('Payment amount must match delivery amount', 'danger')
-                return redirect(url_for('process_delivery_payment_new', delivery_id=delivery_id))
-            
-            # Create delivery payment
-            delivery_payment = DeliveryPayment(
-                delivery_id=delivery_id,
-                user_id=current_user.id,
-                amount=amount,
-                payment_method=payment_method,
-                payment_status='completed',
-                notes=notes,
-                payment_date=datetime.utcnow()
-            )
-            
-            # Update delivery payment status
-            delivery.payment_status = 'paid'
-            
-            db.session.add(delivery_payment)
-            db.session.commit()
-            
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({
-                    'success': True, 
-                    'message': 'Delivery payment processed successfully',
-                    'payment_id': delivery_payment.id
-                })
-            
-            flash('Delivery payment processed successfully', 'success')
-            return redirect(url_for('delivery_payment_detail', payment_id=delivery_payment.id))
-            
-        except Exception as e:
-            db.session.rollback()
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': f'Error processing payment: {str(e)}'})
-            flash(f'Error processing payment: {str(e)}', 'danger')
-            return redirect(url_for('process_delivery_payment_new', delivery_id=delivery_id))
-    
-    # GET request - show payment form
-    return render_template('process_delivery_payment.html',
-                         user=current_user,
-                         delivery=delivery)
-
-@app.route("/delivery-payments/<int:payment_id>/refund", methods=['POST'])
-@login_required
-def refund_delivery_payment(payment_id):
-    """Refund a delivery payment"""
-    payment = DeliveryPayment.query.get_or_404(payment_id)
-    
-    try:
-        data = request.get_json() if request.is_json else request.form.to_dict()
-        refund_reason = data.get('refund_reason', '')
-        
-        # Update payment status
-        payment.payment_status = 'refunded'
-        payment.notes = f"Refunded: {refund_reason}" if refund_reason else "Payment refunded"
-        
-        # Update delivery payment status
-        delivery = payment.delivery
-        delivery.payment_status = 'pending'
-        
-        db.session.commit()
-        
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({
-                'success': True, 
-                'message': 'Delivery payment refunded successfully'
-            })
-        
-        flash('Delivery payment refunded successfully', 'success')
-        return redirect(url_for('delivery_payment_detail', payment_id=payment_id))
-        
-    except Exception as e:
-        db.session.rollback()
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'message': f'Error refunding payment: {str(e)}'})
-        flash(f'Error refunding payment: {str(e)}', 'danger')
-        return redirect(url_for('delivery_payment_detail', payment_id=payment_id))
-
-@app.route("/orders/<int:order_id>/invoice/pdf")
-@login_required
-@sales_required
-def download_invoice_pdf(order_id):
-    """Generate and download PDF invoice for an order"""
-    try:
-        order = Order.query.get_or_404(order_id)
-        
-        # Get the invoice for this order
-        invoice = Invoice.query.filter_by(orderid=order.id).first()
-        if not invoice:
-            flash('No invoice found for this order', 'warning')
-            return redirect(url_for('order_detail', order_id=order_id))
-        
-        # Generate PDF
-        from app.pdf_utils import generate_invoice_pdf
-        pdf_buffer = generate_invoice_pdf(invoice.id)
-        
-        # Return PDF as download
-        from flask import send_file
-        pdf_buffer.seek(0)
-        return send_file(
-            pdf_buffer,
-            as_attachment=True,
-            download_name=f"invoice_{invoice.invoice_number}.pdf",
-            mimetype='application/pdf'
-        )
-        
-    except Exception as e:
-        flash(f'Error generating PDF: {str(e)}', 'danger')
-        return redirect(url_for('order_detail', order_id=order_id))
-
-@app.route("/orders/<int:order_id>/invoice/send")
-@login_required
-@sales_required
-def send_invoice_email(order_id):
-    """Manually send invoice email for an order"""
-    try:
-        order = Order.query.get_or_404(order_id)
-        
-        # Get the invoice for this order
-        invoice = Invoice.query.filter_by(orderid=order.id).first()
-        if not invoice:
-            flash('No invoice found for this order', 'warning')
-            return redirect(url_for('order_detail', order_id=order_id))
-        
-        # Generate PDF and send email
-        from app.pdf_utils import generate_invoice_pdf
-        from email_service import get_email_service
-        
-        pdf_data = generate_invoice_pdf(invoice.id)
-        email_service = get_email_service()
-        
-        if email_service:
-            email_result = email_service.send_invoice_email(
-                to_email=order.user.email,
-                user_name=f"{order.user.firstname} {order.user.lastname}",
-                order_id=order.id,
-                invoice_number=invoice.invoice_number,
-                pdf_attachment=pdf_data.getvalue()
-            )
-            
-            if email_result['success']:
-                flash('Invoice email sent successfully!', 'success')
-            else:
-                flash(f'Failed to send invoice email: {email_result.get("error", "Unknown error")}', 'danger')
-        else:
-            flash('Email service not available', 'warning')
-        
-        return redirect(url_for('order_detail', order_id=order_id))
-        
-    except Exception as e:
-        flash(f'Error sending invoice email: {str(e)}', 'danger')
-        return redirect(url_for('order_detail', order_id=order_id))
-
-@app.route("/orders/<int:order_id>/create-invoice")
-@login_required
-@sales_required
-def create_invoice_for_order_manual(order_id):
-    """Manually create an invoice for an order (for debugging)"""
-    try:
-        order = Order.query.get_or_404(order_id)
-        
-        # Check if invoice already exists
-        existing_invoice = Invoice.query.filter_by(orderid=order.id).first()
-        if existing_invoice:
-            flash(f'Invoice already exists: {existing_invoice.invoice_number}', 'info')
-            return redirect(url_for('order_detail', order_id=order_id))
-        
-        # Calculate total amount for the order
-        total_amount = 0
-        for item in order.order_items:
-            if item.final_price is not None:
-                item_price = float(item.final_price)
-            elif item.product.sellingprice is not None:
-                item_price = float(item.product.sellingprice)
-            else:
-                item_price = 0.0
-            total_amount += item.quantity * item_price
-        
-        # Create invoice for the order
-        from app.utils import create_invoice_for_order
-        invoice = create_invoice_for_order(order, total_amount)
-        
-        flash(f'Invoice created successfully: {invoice.invoice_number}', 'success')
-        return redirect(url_for('order_detail', order_id=order_id))
-        
-    except Exception as e:
-        flash(f'Error creating invoice: {str(e)}', 'danger')
-        return redirect(url_for('order_detail', order_id=order_id))
-
-@app.route("/debug/invoices")
-@login_required
-def debug_invoices():
-    """Debug route to check invoice status for all orders"""
-    try:
-        # Get all orders
-        orders = Order.query.all()
-        
-        invoice_status = []
-        for order in orders:
-            invoice = Invoice.query.filter_by(orderid=order.id).first()
-            total_amount = sum(
-                item.quantity * (float(item.final_price) if item.final_price is not None else float(item.product.sellingprice) if item.product.sellingprice is not None else 0.0)
-                for item in order.order_items
-            )
-            
-            invoice_status.append({
-                'order_id': order.id,
-                'order_type': order.ordertype.name,
-                'status': 'Approved' if order.approvalstatus else 'Pending',
-                'total_amount': total_amount,
-                'has_invoice': invoice is not None,
-                'invoice_number': invoice.invoice_number if invoice else None,
-                'invoice_amount': float(invoice.total_amount) if invoice else None,
-                'created_at': order.created_at.strftime('%Y-%m-%d %H:%M')
-            })
-        
-        return jsonify({
-            'success': True,
-            'invoice_status': invoice_status,
-            'total_orders': len(orders),
-            'orders_with_invoices': len([o for o in invoice_status if o['has_invoice']]),
-            'orders_without_invoices': len([o for o in invoice_status if not o['has_invoice']])
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        })
-
-@app.route("/orders/<int:order_id>/invoice/view")
-@login_required
-@sales_required
-def view_invoice_pdf(order_id):
-    """View PDF invoice in the browser"""
-    try:
-        order = Order.query.get_or_404(order_id)
-        
-        # Get the invoice for this order
-        invoice = Invoice.query.filter_by(orderid=order.id).first()
-        if not invoice:
-            flash('No invoice found for this order', 'warning')
-            return redirect(url_for('order_detail', order_id=order_id))
-        
-        # Generate PDF
-        from app.pdf_utils import generate_invoice_pdf
-        pdf_buffer = generate_invoice_pdf(invoice.id)
-        
-        # Return PDF for viewing in browser
-        from flask import send_file
-        pdf_buffer.seek(0)
-        return send_file(
-            pdf_buffer,
-            as_attachment=False,  # This makes it view in browser
-            download_name=f"invoice_{invoice.invoice_number}.pdf",
-            mimetype='application/pdf'
-        )
-        
-    except Exception as e:
-        flash(f'Error generating PDF: {str(e)}', 'danger')
-        return redirect(url_for('order_detail', order_id=order_id))
-
-# Quotation Management Routes
-@app.route("/quotations")
-@login_required
-def quotations_page():
-    """List all quotations"""
-    page = request.args.get('page', 1, type=int)
-    status = request.args.get('status', '')
-    search = request.args.get('search', '')
-    
-    query = Quotation.query
-    
-    if status:
-        query = query.filter_by(status=status)
-    if search:
-        query = query.filter(Quotation.customer_name.ilike(f'%{search}%'))
-    
-    # For non-admin users, show only their quotations
-    if current_user.role != 'admin':
-        query = query.filter_by(created_by=current_user.id)
-    
-    quotations = query.order_by(Quotation.created_at.desc()).paginate(page=page, per_page=20, error_out=False)
-    
-    return render_template('quotations.html',
-                         user=current_user,
-                         quotations=quotations.items,
-                         pagination=quotations,
-                         current_status=status,
-                         current_search=search)
-
-
-@app.route("/quotations/create", methods=['GET', 'POST'])
-@login_required
-def create_quotation():
-    """Create a new quotation"""
-    if request.method == 'POST':
-        try:
-            # Handle both JSON and form data
-            if request.is_json:
-                data = request.get_json()
-            else:
-                data = request.form.to_dict()
-                # Convert items from string to list if it's form data
-                if 'items' in data and isinstance(data['items'], str):
-                    try:
-                        data['items'] = json.loads(data['items'])
-                    except json.JSONDecodeError:
-                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                            return jsonify({'success': False, 'message': 'Invalid items data format'})
-                        flash('Invalid items data format', 'danger')
-                        return redirect(url_for('create_quotation'))
-            
-            # Validate required fields
-            if not data.get('customer_name') or not data.get('branch_id'):
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': False, 'message': 'Customer name and branch are required'})
-                flash('Customer name and branch are required', 'danger')
-                return redirect(url_for('create_quotation'))
-            
-            if not data.get('items') or len(data['items']) == 0:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                    return jsonify({'success': False, 'message': 'At least one item is required'})
-                flash('At least one item is required', 'danger')
-                return redirect(url_for('create_quotation'))
-            
-            success, quotation_id, total_amount = QuotationService.create_quotation(data, current_user)
-            
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({
-                    'success': True,
-                    'quotation_id': quotation_id,
-                    'total_amount': total_amount,
-                    'message': 'Quotation created successfully'
-                })
-            
-            flash(f'Quotation created successfully! Quotation ID: {quotation_id}', 'success')
-            return redirect(url_for('quotation_detail', quotation_id=quotation_id))
-            
-        except Exception as e:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': str(e)})
-            flash(f'Error creating quotation: {str(e)}', 'danger')
-            return redirect(url_for('create_quotation'))
-    
-    # GET request - show form
-    branches = Branch.query.all()
-    products = Product.query.filter_by(display=True).all()
-    categories = Category.query.all()
-    
-    return render_template('create_quotation.html',
-                         user=current_user,
-                         branches=branches,
-                         products=products,
-                         categories=categories)
-
-
-@app.route("/quotations/<int:quotation_id>")
-@login_required
-def quotation_detail(quotation_id):
-    """View quotation details"""
-    quotation = Quotation.query.get_or_404(quotation_id)
-    
-    # Check if user has access to this quotation
-    if current_user.role != 'admin' and quotation.created_by != current_user.id:
-        flash('Access denied', 'danger')
-        return redirect(url_for('quotations_page'))
-    
-    return render_template('quotation_detail.html',
-                         user=current_user,
-                         quotation=quotation)
-
-
-@app.route("/quotations/<int:quotation_id>/pdf")
-@login_required
-def view_quotation_pdf(quotation_id):
-    """View quotation PDF in browser"""
-    quotation = Quotation.query.get_or_404(quotation_id)
-    
-    # Check if user has access to this quotation
-    if current_user.role != 'admin' and quotation.created_by != current_user.id:
-        flash('Access denied', 'danger')
-        return redirect(url_for('quotations_page'))
-    
-    try:
-        from app.pdf_utils import generate_quotation_pdf
-        pdf_buffer = generate_quotation_pdf(quotation_id)
-        
-        response = make_response(pdf_buffer.getvalue())
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'inline; filename=quotation_{quotation.quotation_number}.pdf'
-        return response
-    except Exception as e:
-        flash(f'Error generating PDF: {str(e)}', 'danger')
-        return redirect(url_for('quotation_detail', quotation_id=quotation_id))
-
-
-@app.route("/quotations/<int:quotation_id>/download")
-@login_required
-def download_quotation_pdf(quotation_id):
-    """Download quotation PDF"""
-    quotation = Quotation.query.get_or_404(quotation_id)
-    
-    # Check if user has access to this quotation
-    if current_user.role != 'admin' and quotation.created_by != current_user.id:
-        flash('Access denied', 'danger')
-        return redirect(url_for('quotations_page'))
-    
-    try:
-        from app.pdf_utils import generate_quotation_pdf
-        pdf_buffer = generate_quotation_pdf(quotation_id)
-        
-        response = make_response(pdf_buffer.getvalue())
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=quotation_{quotation.quotation_number}.pdf'
-        return response
-    except Exception as e:
-        flash(f'Error generating PDF: {str(e)}', 'danger')
-        return redirect(url_for('quotation_detail', quotation_id=quotation_id))
-
-
-@app.route("/quotations/<int:quotation_id>/status", methods=['POST'])
-@login_required
-def update_quotation_status(quotation_id):
-    """Update quotation status"""
-    quotation = Quotation.query.get_or_404(quotation_id)
-    
-    # Check if user has access to this quotation
-    if current_user.role != 'admin' and quotation.created_by != current_user.id:
-        return jsonify({'success': False, 'message': 'Access denied'})
-    
-    try:
-        data = request.get_json() if request.is_json else request.form.to_dict()
-        new_status = data.get('status')
-        
-        if not new_status:
-            return jsonify({'success': False, 'message': 'Status is required'})
-        
-        success, message = QuotationService.update_quotation_status(quotation_id, new_status)
-        
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': success, 'message': message})
-        
-        flash(message, 'success' if success else 'danger')
-        return redirect(url_for('quotation_detail', quotation_id=quotation_id))
-        
-    except Exception as e:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'success': False, 'message': str(e)})
-        flash(f'Error updating quotation status: {str(e)}', 'danger')
-        return redirect(url_for('quotation_detail', quotation_id=quotation_id))
 
 if __name__ == '__main__':
     app.run(debug=False)

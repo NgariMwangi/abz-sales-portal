@@ -4,7 +4,6 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Products</h2>
     <div>
-        <a href="{{ url_for('stock_page') }}" class="btn btn-warning me-2">Manage Stock</a>
         <button class="btn btn-primary" onclick="exportProducts()">Export</button>
     </div>
 </div>
@@ -21,9 +20,9 @@
                 <label for="category" class="form-label">Category</label>
                 <select class="form-select" id="category" name="category">
                     <option value="">All Categories</option>
-                    {% for category in categories %}
-                    <option value="{{ category.name }}" {% if current_category == category.name %}selected{% endif %}>
-                        {{ category.name }}
+                    {% for subcategory in subcategories %}
+                    <option value="{{ subcategory.category.name }}" {% if current_category == subcategory.category.name %}selected{% endif %}>
+                        {{ subcategory.category.name }} - {{ subcategory.name }}
                     </option>
                     {% endfor %}
                 </select>
@@ -66,7 +65,6 @@
                         <th>Selling Price</th>
                         <th>Stock</th>
                         <th>Status</th>
-                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -81,8 +79,8 @@
                         </td>
                         <td>{{ product.category }}</td>
                         <td>{{ product.branch }}</td>
-                        <td>${{ "%.2f"|format(product.buying_price) }}</td>
-                        <td>${{ "%.2f"|format(product.selling_price) }}</td>
+                        <td>KSh{{ "%.2f"|format(product.buying_price) }}</td>
+                        <td>KSh{{ "%.2f"|format(product.selling_price) }}</td>
                         <td>
                             <span class="badge {% if product.stock < 10 %}bg-danger{% elif product.stock < 50 %}bg-warning{% else %}bg-success{% endif %}">
                                 {{ product.stock }}
@@ -92,12 +90,6 @@
                             <span class="badge {% if product.display %}bg-success{% else %}bg-secondary{% endif %}">
                                 {{ 'Active' if product.display else 'Hidden' }}
                             </span>
-                        </td>
-                        <td>
-                            <div class="btn-group" role="group">
-                                <a href="{{ url_for('edit_product', product_id=product.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-                                <button class="btn btn-sm btn-outline-warning" onclick="quickStockUpdate({{ product.id }}, '{{ product.name }}', {{ product.stock }})">Stock</button>
-                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -153,99 +145,10 @@
         {% endif %}
     </div>
 </div>
-
-<!-- Quick Stock Update Modal -->
-<div class="modal fade" id="stockModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Quick Stock Update</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p><strong>Product:</strong> <span id="modalProductName"></span></p>
-                <p><strong>Current Stock:</strong> <span id="modalCurrentStock"></span></p>
-                <div class="mb-3">
-                    <label for="stockAction" class="form-label">Action</label>
-                    <select class="form-select" id="stockAction">
-                        <option value="add">Add Stock</option>
-                        <option value="remove">Remove Stock</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label for="stockQuantity" class="form-label">Quantity</label>
-                    <input type="number" class="form-control" id="stockQuantity" min="1" value="1">
-                </div>
-                <div class="mb-3">
-                    <label for="stockNotes" class="form-label">Notes (Optional)</label>
-                    <textarea class="form-control" id="stockNotes" rows="2"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="updateStock()">Update Stock</button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-let currentProductId = null;
-
-function quickStockUpdate(productId, productName, currentStock) {
-    currentProductId = productId;
-    document.getElementById('modalProductName').textContent = productName;
-    document.getElementById('modalCurrentStock').textContent = currentStock;
-    document.getElementById('stockQuantity').value = 1;
-    document.getElementById('stockNotes').value = '';
-    
-    const modal = new bootstrap.Modal(document.getElementById('stockModal'));
-    modal.show();
-}
-
-function updateStock() {
-    const action = document.getElementById('stockAction').value;
-    const quantity = parseInt(document.getElementById('stockQuantity').value);
-    const notes = document.getElementById('stockNotes').value;
-    
-    if (!quantity || quantity < 1) {
-        alert('Please enter a valid quantity.');
-        return;
-    }
-    
-    const url = action === 'add' ? '/stock/add' : '/stock/remove';
-    const data = {
-        product_id: currentProductId,
-        quantity: quantity,
-        notes: notes
-    };
-    
-    fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('success', data.message);
-            bootstrap.Modal.getInstance(document.getElementById('stockModal')).hide();
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            showAlert('danger', 'Error: ' + data.message);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showAlert('danger', 'An error occurred while updating stock.');
-    });
-}
-
 function exportProducts() {
     const params = new URLSearchParams(window.location.search);
     const url = `/products/export?${params.toString()}`;

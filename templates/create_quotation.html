@@ -63,10 +63,10 @@
                         <div class="mb-3">
                             <label for="category_filter" class="form-label">Filter by Category</label>
                             <select class="form-select" id="category_filter">
-                                <option value="">All Categories</option>
-                                {% for category in categories %}
-                                <option value="{{ category.id }}">{{ category.name }}</option>
-                                {% endfor %}
+                                                            <option value="">All Categories</option>
+                            {% for subcategory in subcategories %}
+                            <option value="{{ subcategory.id }}">{{ subcategory.category.name }} - {{ subcategory.name }}</option>
+                            {% endfor %}
                             </select>
                         </div>
                         <div class="mb-3">

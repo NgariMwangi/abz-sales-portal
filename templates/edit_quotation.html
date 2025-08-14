@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Quotation{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Edit Quotation</h2>
+        <a href="{{ url_for('quotation_detail', quotation_id=quotation.id) }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Quotation
+        </a>
+    </div>
+
+    <form id="editQuotationForm" method="POST">
+        <div class="row">
+            <!-- Customer Information -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Customer Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="customer_name" class="form-label">Customer Name *</label>
+                            <input type="text" class="form-control" id="customer_name" name="customer_name" value="{{ quotation.customer_name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="customer_email" class="form-label">Customer Email</label>
+                            <input type="email" class="form-control" id="customer_email" name="customer_email" value="{{ quotation.customer_email or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="customer_phone" class="form-label">Customer Phone</label>
+                            <input type="tel" class="form-control" id="customer_phone" name="customer_phone" value="{{ quotation.customer_phone or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="branch_id" class="form-label">Branch *</label>
+                            <select class="form-select" id="branch_id" name="branch_id" required disabled>
+                                <option value="{{ quotation.branch_id }}" selected>{{ quotation.branch.name }} - {{ quotation.branch.location }}</option>
+                            </select>
+                            <small class="text-muted">Branch cannot be changed after creation</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="valid_until" class="form-label">Valid Until</label>
+                            <input type="date" class="form-control" id="valid_until" name="valid_until" value="{{ quotation.valid_until.strftime('%Y-%m-%d') if quotation.valid_until else '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Additional notes...">{{ quotation.notes or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Selection -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Product Selection</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="category_filter" class="form-label">Filter by Category</label>
+                            <select class="form-select" id="category_filter">
+                                <option value="">All Categories</option>
+                                {% for subcategory in subcategories %}
+                                <option value="{{ subcategory.id }}">{{ subcategory.category.name }} - {{ subcategory.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="product_select" class="form-label">Select Product</label>
+                            <select class="form-select" id="product_select">
+                                <option value="">Choose a product...</option>
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="quantity" class="form-label">Quantity</label>
+                                <input type="number" class="form-control" id="quantity" value="1" min="1">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="unit_price" class="form-label">Unit Price (KSh)</label>
+                                <input type="number" class="form-control" id="unit_price" step="0.01" min="0">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="item_notes" class="form-label">Item Notes</label>
+                            <input type="text" class="form-control" id="item_notes" placeholder="Notes for this item...">
+                        </div>
+                        <button type="button" class="btn btn-success w-100" onclick="addProduct()">
+                            <i class="fas fa-plus"></i> Add Product
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quotation Items -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Quotation Items</h5>
+            </div>
+            <div class="card-body">
+                <div id="quotationItems">
+                    {% for item in quotation.items %}
+                    <div class="quotation-item border rounded p-3 mb-3" data-item-id="{{ item.id }}">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <label class="form-label">Product</label>
+                                <select class="form-select" name="item_id[]" required>
+                                    <option value="">Select Product</option>
+                                    {% for product in products %}
+                                    <option value="{{ product.id }}" {% if product.id == item.product_id %}selected{% endif %}>
+                                        {{ product.name }} - {{ product.productcode or 'No Code' }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Quantity</label>
+                                <input type="number" class="form-control" name="quantity[]" value="{{ item.quantity }}" min="1" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Unit Price</label>
+                                <input type="number" class="form-control" name="unit_price[]" value="{{ item.unit_price }}" step="0.01" min="0" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Total</label>
+                                <input type="text" class="form-control" value="KSh{{ "%.2f"|format(item.total_price) }}" readonly>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Notes</label>
+                                <input type="text" class="form-control" name="notes[]" value="{{ item.notes or '' }}">
+                            </div>
+                            <div class="col-md-1">
+                                <label class="form-label">Remove</label>
+                                <button type="button" class="btn btn-danger btn-sm w-100 remove-item-btn" title="Remove this item">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="text-center" id="noItemsMessage" {% if quotation.items %}style="display: none;"{% endif %}>
+                    <p class="text-muted">No items added yet. Use the form above to add products.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary and Submit -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Quotation Summary</h6>
+                        <p><strong>Quotation Number:</strong> {{ quotation.quotation_number }}</p>
+                        <p><strong>Created:</strong> {{ quotation.created_at.strftime('%B %d, %Y') }}</p>
+                        <p><strong>Status:</strong> <span class="badge bg-{{ 'warning' if quotation.status == 'pending' else 'success' if quotation.status == 'accepted' else 'danger' if quotation.status == 'rejected' else 'secondary' }}">{{ quotation.status.title() }}</span></p>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <h6>Total Amount</h6>
+                        <h3 class="text-primary">KSh{{ "%.2f"|format(quotation.total_amount) }}</h3>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between mt-3">
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.history.back()">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update Quotation
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+// Load products based on category filter
+document.getElementById('category_filter').addEventListener('change', function() {
+    const categoryId = this.value;
+    const productSelect = document.getElementById('product_select');
+    
+    // Clear current options
+    productSelect.innerHTML = '<option value="">Choose a product...</option>';
+    
+    // Load all products
+    const products = [
+        {% for product in products %}
+        {
+            id: '{{ product.id }}',
+            name: '{{ product.name }} - {{ product.productcode or "No Code" }}',
+            subcategory_id: '{{ product.subcategory_id }}'
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    // Filter and add products
+    products.forEach(product => {
+        if (!categoryId || product.subcategory_id === categoryId) {
+            const option = document.createElement('option');
+            option.value = product.id;
+            option.textContent = product.name;
+            productSelect.appendChild(option);
+        }
+    });
+});
+
+// Auto-populate unit price when product is selected
+document.getElementById('product_select').addEventListener('change', function() {
+    const productId = this.value;
+    if (productId) {
+        // Find the product and set its selling price
+        const productPrices = {
+            {% for product in products %}
+            '{{ product.id }}': {{ product.sellingprice or 0 }}{% if not loop.last %},{% endif %}
+            {% endfor %}
+        };
+        
+        if (productPrices[productId]) {
+            document.getElementById('unit_price').value = productPrices[productId];
+        }
+    }
+});
+
+// Calculate total when quantity or unit price changes
+function calculateTotal(input) {
+    const item = input.closest('.quotation-item');
+    const quantity = item.querySelector('input[name="quantity[]"]').value;
+    const unitPrice = item.querySelector('input[name="unit_price[]"]').value;
+    const totalInput = item.querySelector('input[readonly]');
+    
+    if (quantity && unitPrice) {
+        const total = (parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2);
+        totalInput.value = `KSh${total}`;
+    }
+}
+
+// Add event listeners to existing quantity and unit price inputs
+document.addEventListener('DOMContentLoaded', function() {
+    const items = document.querySelectorAll('.quotation-item');
+    items.forEach(item => {
+        const quantityInput = item.querySelector('input[name="quantity[]"]');
+        const unitPriceInput = item.querySelector('input[name="unit_price[]"]');
+        
+        quantityInput.addEventListener('input', () => calculateTotal(quantityInput));
+        unitPriceInput.addEventListener('input', () => calculateTotal(unitPriceInput));
+    });
+    
+    // Use event delegation for remove buttons
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.remove-item-btn')) {
+            removeItem(e.target.closest('.remove-item-btn'));
+        }
+    });
+});
+
+function addProduct() {
+    const productSelect = document.getElementById('product_select');
+    const quantity = document.getElementById('quantity').value;
+    const unitPrice = document.getElementById('unit_price').value;
+    const notes = document.getElementById('item_notes').value;
+    
+    if (!productSelect.value || !quantity || !unitPrice) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    const productText = productSelect.options[productSelect.selectedIndex].text;
+    const total = (parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2);
+    
+    const itemHtml = `
+        <div class="quotation-item border rounded p-3 mb-3" data-item-id="new">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">Product</label>
+                    <select class="form-select" name="item_id[]" required>
+                        <option value="">Select Product</option>
+                        {% for product in products %}
+                        <option value="{{ product.id }}" ${productSelect.value == '{{ product.id }}' ? 'selected' : ''}>
+                            {{ product.name }} - {{ product.productcode or 'No Code' }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" class="form-control" name="quantity[]" value="${quantity}" min="1" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Unit Price</label>
+                    <input type="number" class="form-control" name="unit_price[]" value="${unitPrice}" step="0.01" min="0" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Total</label>
+                    <input type="text" class="form-control" value="KSh${total}" readonly>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Notes</label>
+                    <input type="text" class="form-control" name="notes[]" value="${notes}">
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">Remove</label>
+                    <button type="button" class="btn btn-danger btn-sm w-100 remove-item-btn" title="Remove this item">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('quotationItems').insertAdjacentHTML('beforeend', itemHtml);
+    
+    // Add event listeners to new inputs
+    const newItem = document.getElementById('quotationItems').lastElementChild;
+    const quantityInput = newItem.querySelector('input[name="quantity[]"]');
+    const unitPriceInput = newItem.querySelector('input[name="unit_price[]"]');
+    
+    quantityInput.addEventListener('input', () => calculateTotal(quantityInput));
+    unitPriceInput.addEventListener('input', () => calculateTotal(unitPriceInput));
+    
+    // Clear form
+    productSelect.value = '';
+    document.getElementById('quantity').value = '1';
+    document.getElementById('unit_price').value = '';
+    document.getElementById('item_notes').value = '';
+    
+    // Hide no items message
+    document.getElementById('noItemsMessage').style.display = 'none';
+}
+
+function removeItem(button) {
+    const item = button.closest('.quotation-item');
+    item.remove();
+    
+    // Show no items message if no items left
+    const items = document.querySelectorAll('.quotation-item');
+    if (items.length === 0) {
+        document.getElementById('noItemsMessage').style.display = 'block';
+    }
+}
+
+// Form validation
+document.getElementById('editQuotationForm').addEventListener('submit', function(e) {
+    const items = document.querySelectorAll('.quotation-item');
+    if (items.length === 0) {
+        e.preventDefault();
+        alert('Please add at least one item to the quotation');
+        return;
+    }
+    
+    // Validate each item
+    let isValid = true;
+    items.forEach(item => {
+        const product = item.querySelector('select[name="item_id[]"]').value;
+        const quantity = item.querySelector('input[name="quantity[]"]').value;
+        const unitPrice = item.querySelector('input[name="unit_price[]"]').value;
+        
+        if (!product || !quantity || !unitPrice) {
+            isValid = false;
+        }
+    });
+    
+    if (!isValid) {
+        e.preventDefault();
+        alert('Please fill in all required fields for all items');
+    }
+});
+</script>
+{% endblock %}

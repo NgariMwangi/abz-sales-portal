@@ -19,11 +19,11 @@
                         <input type="text" class="form-control" id="name" name="name" value="{{ product.name }}" required>
                     </div>
                     <div class="mb-3">
-                        <label for="category_id" class="form-label">Category</label>
+                        <label for="category_id" class="form-label">Subcategory</label>
                         <select class="form-select" id="category_id" name="category_id" required>
-                            {% for category in categories %}
-                            <option value="{{ category.id }}" {% if category.id == product.categoryid %}selected{% endif %}>
-                                {{ category.name }}
+                            {% for subcategory in subcategories %}
+                            <option value="{{ subcategory.id }}" {% if subcategory.id == product.subcategory_id %}selected{% endif %}>
+                                {{ subcategory.category.name }} - {{ subcategory.name }}
                             </option>
                             {% endfor %}
                         </select>
