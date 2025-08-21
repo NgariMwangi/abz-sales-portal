@@ -55,20 +55,30 @@
                             {% endif %}
                         </td>
                                                         <td>{{ product.sub_category.category.name if product.sub_category and product.sub_category.category else 'Uncategorized' }}</td>
-                        <td>
-                            <span class="badge {% if product.stock < 10 %}bg-danger{% elif product.stock < 50 %}bg-warning{% else %}bg-success{% endif %} fs-6">
-                                {{ product.stock }}
-                            </span>
-                        </td>
-                        <td>
-                            {% if product.stock < 10 %}
-                            <span class="badge bg-danger">Low Stock</span>
-                            {% elif product.stock < 50 %}
-                            <span class="badge bg-warning">Medium Stock</span>
-                            {% else %}
-                            <span class="badge bg-success">Good Stock</span>
-                            {% endif %}
-                        </td>
+                                                        <td>
+                                                            {% if product.stock is none %}
+                                                                <span class="badge bg-secondary fs-6">0</span>
+                                                            {% elif product.stock < 10 %}
+                                                                <span class="badge bg-danger fs-6">{{ product.stock }}</span>
+                                                            {% elif product.stock < 50 %}
+                                                                <span class="badge bg-warning fs-6">{{ product.stock }}</span>
+                                                            {% else %}
+                                                                <span class="badge bg-success fs-6">{{ product.stock }}</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        
+                                                        <td>
+                                                            {% if product.stock is none %}
+                                                                <span class="badge bg-danger">No Stock</span>
+                                                            {% elif product.stock < 10 %}
+                                                                <span class="badge bg-danger">Low Stock</span>
+                                                            {% elif product.stock < 50 %}
+                                                                <span class="badge bg-warning">Medium Stock</span>
+                                                            {% else %}
+                                                                <span class="badge bg-success">Good Stock</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        
                         <td>
                             <div class="btn-group" role="group">
                                 <button class="btn btn-sm btn-success" onclick="addStock({{ product.id }}, '{{ product.name }}', {{ product.stock }})">

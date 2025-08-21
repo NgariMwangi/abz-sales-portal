@@ -79,13 +79,22 @@
                         </td>
                         <td>{{ product.category }}</td>
                         <td>{{ product.branch }}</td>
-                        <td>KSh{{ "%.2f"|format(product.buying_price) }}</td>
-                        <td>KSh{{ "%.2f"|format(product.selling_price) }}</td>
+                        <td>KSh{{ "%.2f"|format(product.buying_price or 0) }}</td>
+                        <td>KSh{{ "%.2f"|format(product.selling_price or 0) }}</td>
                         <td>
-                            <span class="badge {% if product.stock < 10 %}bg-danger{% elif product.stock < 50 %}bg-warning{% else %}bg-success{% endif %}">
-                                {{ product.stock }}
+                            <span class="badge 
+                                {% if product.stock is not none %}
+                                    {% if product.stock < 10 %}bg-danger
+                                    {% elif product.stock < 50 %}bg-warning
+                                    {% else %}bg-success
+                                    {% endif %}
+                                {% else %}
+                                    bg-secondary
+                                {% endif %}">
+                                {{ product.stock if product.stock is not none else "0" }}
                             </span>
                         </td>
+                        
                         <td>
                             <span class="badge {% if product.display %}bg-success{% else %}bg-secondary{% endif %}">
                                 {{ 'Active' if product.display else 'Hidden' }}
