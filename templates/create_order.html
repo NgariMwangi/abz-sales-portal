@@ -1,5 +1,88 @@
 {% extends "base.html" %}
 {% block title %}Create Walk-in Order - ABZ Hardware{% endblock %}
+
+{% block extra_css %}
+<style>
+    .search-input-group {
+        position: relative;
+    }
+    
+    .search-input-group .btn {
+        border-left: none;
+    }
+    
+    .search-input-group .form-control {
+        border-right: none;
+    }
+    
+    .search-input-group .form-control:focus {
+        border-right: none;
+        box-shadow: none;
+    }
+    
+    .search-input-group .btn:focus {
+        box-shadow: none;
+    }
+    
+    .product-count-info {
+        font-size: 0.875rem;
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    .search-active {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    
+    .spin {
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Search input styling */
+    #product_search:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    }
+    
+    #product_search.is-valid {
+        border-color: #198754;
+        box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
+    }
+    
+    /* Button transitions */
+    .btn {
+        transition: all 0.2s ease-in-out;
+    }
+    
+    .btn:hover {
+        transform: translateY(-1px);
+    }
+    
+    /* Product count styling */
+    #product_count .text-success {
+        color: #198754 !important;
+    }
+    
+    #product_count .text-info {
+        color: #0dcaf0 !important;
+    }
+    
+    #product_count .text-danger {
+        color: #dc3545 !important;
+    }
+    
+    #product_count .text-muted {
+        color: #6c757d !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Create New Walk-in Order</h2>
@@ -45,11 +128,26 @@
                         </select>
                     </div>
                     <div class="mb-3">
+                        <label for="product_search" class="form-label">Search Products</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="product_search" placeholder="Type to search products...">
+                            <button class="btn btn-primary" type="button" id="searchBtn">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                            <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn" style="display: none;">
+                                <i class="bi bi-x"></i> Clear
+                            </button>
+                        </div>
+                        <div class="form-text">Search by product name, code, price, or stock</div>
+                    </div>
+                    <div class="mb-3">
                         <label for="product_select" class="form-label">Product</label>
                         <select class="form-select" id="product_select">
                             <option value="">Select Branch First</option>
                         </select>
-                        <div class="form-text">Please select a branch above to view available products</div>
+                        <div class="form-text">
+                            <span id="product_count" class="product-count-info">Please select a branch above to view available products</span>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="quantity" class="form-label">Quantity</label>
@@ -84,16 +182,96 @@
 <script>
 let orderItems = [];
 let products = [];
+let searchQuery = '';
+let searchTimeout = null;
 
 // Load products when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Don't load products initially - wait for branch selection
-    // loadProducts();
-    
     // Add event listeners
-    document.getElementById('category_filter').addEventListener('change', loadProducts);
+    document.getElementById('category_filter').addEventListener('change', function() {
+        // Preserve search state when changing categories
+        loadProducts();
+    });
     document.getElementById('product_select').addEventListener('change', updateProductInfo);
+    
+    // Add search functionality with proper event handling
+    const searchInput = document.getElementById('product_search');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    
+    // Search button click
+    searchBtn.addEventListener('click', performSearch);
+    
+    // Clear search button click
+    clearSearchBtn.addEventListener('click', clearSearch);
+    
+    // Search input events
+    searchInput.addEventListener('input', function() {
+        // Clear previous timeout
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+        
+        // Set new timeout for debounced search
+        searchTimeout = setTimeout(() => {
+            if (this.value.trim() !== searchQuery) {
+                performSearch();
+            }
+        }, 300); // 300ms delay
+    });
+    
+    // Enter key in search input
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            performSearch();
+        }
+    });
 });
+
+function performSearch() {
+    const searchInput = document.getElementById('product_search');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    
+    searchQuery = searchInput.value.trim();
+    
+    // Update UI based on search state
+    if (searchQuery) {
+        searchBtn.style.display = 'none';
+        clearSearchBtn.style.display = 'block';
+        searchInput.classList.add('is-valid');
+        
+        // Show loading state in clear button temporarily
+        clearSearchBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Searching...';
+        clearSearchBtn.disabled = true;
+    } else {
+        searchBtn.style.display = 'block';
+        clearSearchBtn.style.display = 'none';
+        searchInput.classList.remove('is-valid');
+    }
+    
+    // Load products with search
+    loadProducts();
+}
+
+function clearSearch() {
+    const searchInput = document.getElementById('product_search');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    
+    searchInput.value = '';
+    searchQuery = '';
+    
+    // Reset UI
+    searchBtn.style.display = 'block';
+    clearSearchBtn.style.display = 'none';
+    searchInput.classList.remove('is-valid');
+    searchInput.focus();
+    
+    // Load products without search
+    loadProducts();
+}
 
 function loadProducts() {
     const categoryId = document.getElementById('category_filter').value;
@@ -106,31 +284,115 @@ function loadProducts() {
         return;
     }
     
-    let url = '/api/products?';
-    if (categoryId) url += `category_id=${categoryId}&`;
-    if (branchId) url += `branch_id=${branchId}&`;
+    // Show loading state
+    const productCount = document.getElementById('product_count');
+    productCount.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Loading products...';
     
+    // Disable search input during loading
+    const searchInput = document.getElementById('product_search');
+    searchInput.disabled = true;
+    
+    // Build API URL
+    const params = new URLSearchParams();
+    if (categoryId) params.append('category_id', categoryId);
+    if (branchId) params.append('branch_id', branchId);
+    if (searchQuery) params.append('search', searchQuery);
+    
+    const url = `/api/products?${params.toString()}`;
+    
+    // Fetch products
     fetch(url)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            products = data;
+            // Check if response has error property
+            if (data && data.error) {
+                throw new Error(data.error);
+            }
+            
+            products = data || [];
             updateProductSelect();
+            
+            // Reset clear button state if search was performed
+            if (searchQuery) {
+                const clearSearchBtn = document.getElementById('clearSearchBtn');
+                clearSearchBtn.innerHTML = '<i class="bi bi-x"></i> Clear';
+                clearSearchBtn.disabled = false;
+            }
         })
         .catch(error => {
             console.error('Error loading products:', error);
+            productCount.innerHTML = `<span class="text-danger">Error loading products: ${error.message}</span>`;
+            products = [];
+            updateProductSelect();
+            
+            // Reset clear button state on error
+            if (searchQuery) {
+                const clearSearchBtn = document.getElementById('clearSearchBtn');
+                clearSearchBtn.innerHTML = '<i class="bi bi-x"></i> Clear';
+                clearSearchBtn.disabled = false;
+            }
+        })
+        .finally(() => {
+            // Re-enable search input
+            searchInput.disabled = false;
         });
 }
 
 function updateProductSelect() {
     const select = document.getElementById('product_select');
+    const productCount = document.getElementById('product_count');
+    
+    // Clear existing options
     select.innerHTML = '<option value="">Select Product</option>';
     
+    if (products.length === 0) {
+        if (searchQuery) {
+            productCount.innerHTML = `
+                <div class="text-center">
+                    <div class="text-muted mb-2">
+                        <i class="bi bi-search"></i> No products found matching "<strong>${searchQuery}</strong>"
+                    </div>
+                    <div class="text-muted small">
+                        Try: 
+                        <button type="button" class="btn btn-link btn-sm p-0" onclick="clearSearch()">clearing the search</button>, 
+                        <button type="button" class="btn btn-link btn-sm p-0" onclick="document.getElementById('category_filter').value='';loadProducts()">removing category filter</button>, 
+                        or using different keywords
+                    </div>
+                </div>
+            `;
+        } else {
+            productCount.innerHTML = '<span class="text-muted">No products available in this branch/category</span>';
+        }
+        return;
+    }
+    
+    // Add product options
     products.forEach(product => {
         const option = document.createElement('option');
         option.value = product.id;
         option.textContent = `${product.name} - KSh${product.selling_price} (Stock: ${product.stock})`;
         select.appendChild(option);
     });
+    
+    // Update product count display
+    if (searchQuery) {
+        const searchTime = new Date().toLocaleTimeString();
+        productCount.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="text-success">
+                    <i class="bi bi-search"></i> Found <strong>${products.length}</strong> product${products.length === 1 ? '' : 's'} matching "<strong>${searchQuery}</strong>"
+                </span>
+                <small class="text-muted">${searchTime}</small>
+            </div>
+        `;
+    } else {
+        productCount.innerHTML = `<span class="text-info"><strong>${products.length}</strong> product${products.length === 1 ? '' : 's'} available</span>`;
+    }
 }
 
 function updateProductInfo() {
@@ -346,16 +608,28 @@ document.getElementById('branch_id').addEventListener('change', function() {
     products = [];
     orderItems = [];
     
+    // Clear search query and reset search UI
+    searchQuery = '';
+    const searchInput = document.getElementById('product_search');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    
+    searchInput.value = '';
+    searchInput.classList.remove('is-valid');
+    searchBtn.style.display = 'block';
+    clearSearchBtn.style.display = 'none';
+    
     // Clear product selection
     document.getElementById('product_select').innerHTML = '<option value="">Select Product</option>';
     
     // Clear order items display
     document.getElementById('orderItems').innerHTML = '<p class="text-muted">No items added yet. Add products to create your walk-in order.</p>';
     
-    // Reset total
+    // Reset total and product count
     document.getElementById('totalAmount').textContent = '0.00';
     document.getElementById('orderItemsData').value = '[]';
     document.getElementById('createOrderBtn').disabled = true;
+    document.getElementById('product_count').textContent = 'Please select a branch above to view available products';
     
     // Load products for the new branch
     loadProducts();

@@ -894,25 +894,52 @@ def remove_stock():
 @app.route("/api/products")
 @login_required
 def api_products():
-    category_id = request.args.get('category_id', type=int)
-    branch_id = request.args.get('branch_id', type=int)
-    
-    query = Product.query.filter_by(display=True)
-    
-    if category_id:
-        query = query.filter_by(subcategory_id=category_id)
-    if branch_id:
-        query = query.filter_by(branchid=branch_id)
-    
-    products = query.all()
-    
-    return jsonify([{
-        'id': p.id,
-        'name': p.name,
-        'selling_price': p.sellingprice,
-        'stock': p.stock,
-        'product_code': p.productcode
-    } for p in products])
+    try:
+        category_id = request.args.get('category_id', type=int)
+        branch_id = request.args.get('branch_id', type=int)
+        search = request.args.get('search', '').strip()
+        
+        # Start with base query
+        query = Product.query.filter_by(display=True)
+        
+        # Apply filters
+        if category_id:
+            query = query.filter_by(subcategory_id=category_id)
+        if branch_id:
+            query = query.filter_by(branchid=branch_id)
+        
+        # Apply search if provided
+        if search:
+            from sqlalchemy import or_
+            # More flexible search across multiple columns
+            search_filter = or_(
+                Product.name.ilike(f'%{search}%'),
+                Product.productcode.ilike(f'%{search}%'),
+                Product.buyingprice.cast(db.String).ilike(f'%{search}%'),
+                Product.sellingprice.cast(db.String).ilike(f'%{search}%'),
+                Product.stock.cast(db.String).ilike(f'%{search}%')
+            )
+            query = query.filter(search_filter)
+        
+        # Execute query
+        products = query.all()
+        
+        # Convert to JSON-serializable format
+        result = []
+        for p in products:
+            result.append({
+                'id': p.id,
+                'name': p.name or '',
+                'selling_price': float(p.sellingprice) if p.sellingprice else 0.0,
+                'stock': int(p.stock) if p.stock else 0,
+                'product_code': p.productcode or ''
+            })
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        app.logger.error(f"Error in api_products: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 # Utility Routes
 @app.route("/categories")
