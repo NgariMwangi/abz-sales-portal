@@ -25,11 +25,17 @@ class OrderService:
                 
                 # Validate that all items have branch selections
                 for item in order.order_items:
+                    if not item.productid or not item.product:
+                        return False, f'Branch selection required for manual item: {item.product_name or "Unknown"}'
                     if str(item.id) not in item_branch_selections:
                         return False, f'Branch selection required for {item.product.name}'
             
             # Update stock for each item
             for item in order.order_items:
+                # Skip stock updates for manual items (they don't have products to update stock for)
+                if not item.productid or not item.product:
+                    continue
+                    
                 if 'online' in order.ordertype.name.lower() and item_branch_selections:
                     # For online orders, reduce stock from the selected branch for this item
                     selected_branch_id = item_branch_selections.get(str(item.id))
@@ -45,13 +51,20 @@ class OrderService:
                     if not product_in_branch:
                         return False, f'Product {item.product.name} not available in selected branch'
                     
+                    # Check stock availability (allow zero stock sales with warning)
                     if product_in_branch.stock < item.quantity:
-                        return False, f'Insufficient stock for {item.product.name} in selected branch (required: {item.quantity}, available: {product_in_branch.stock})'
+                        # Allow the order but log a warning about insufficient stock
+                        print(f"Warning: Ordering {item.quantity} units of {item.product.name} from branch {product_in_branch.branch.name} but only {product_in_branch.stock} available in stock")
+                        # You could also add this to a warnings log or notification system
                     
                     # Update stock from the selected branch
                     previous_stock = product_in_branch.stock
                     product_in_branch.stock -= item.quantity
                     new_stock = product_in_branch.stock
+                    
+                    # Log if stock goes negative (backorder situation)
+                    if new_stock < 0:
+                        print(f"Warning: Product {item.product.name} stock in branch {product_in_branch.branch.name} is now negative ({new_stock}) after order approval")
                     
                     # Create stock transaction record for the selected branch product
                     stock_transaction = StockTransaction(
@@ -61,7 +74,7 @@ class OrderService:
                         quantity=item.quantity,
                         previous_stock=previous_stock,
                         new_stock=new_stock,
-                        notes=f'Order #{order.id} approved - {item.product.name} fulfilled from branch {product_in_branch.branch.name}'
+                        notes=f'Order #{order.id} approved - {item.product.name} fulfilled from branch {product_in_branch.branch.name}' + (' (backorder)' if new_stock < 0 else '')
                     )
                     db.session.add(stock_transaction)
                 else:
@@ -71,6 +84,11 @@ class OrderService:
                     product.stock -= item.quantity
                     new_stock = product.stock
                     
+                    # Log if stock goes negative (backorder situation)
+                    if new_stock < 0:
+                        print(f"Warning: Product {product.name} stock is now negative ({new_stock}) after order approval")
+                        # You could add this to a backorder tracking system
+                    
                     # Create stock transaction record
                     stock_transaction = StockTransaction(
                         productid=product.id,
@@ -79,7 +97,7 @@ class OrderService:
                         quantity=item.quantity,
                         previous_stock=previous_stock,
                         new_stock=new_stock,
-                        notes=f'Order #{order.id} approved'
+                        notes=f'Order #{order.id} approved' + (' (backorder)' if new_stock < 0 else '')
                     )
                     db.session.add(stock_transaction)
             
@@ -95,7 +113,9 @@ class OrderService:
                     for item in order.order_items:
                         if item.final_price is not None:
                             item_price = float(item.final_price)
-                        elif item.product.sellingprice is not None:
+                        elif item.original_price is not None:
+                            item_price = float(item.original_price)
+                        elif item.productid and item.product and item.product.sellingprice is not None:
                             item_price = float(item.product.sellingprice)
                         else:
                             item_price = 0.0
@@ -156,49 +176,94 @@ class OrderService:
             items_data = data.get('items', [])
             
             for item_data in items_data:
-                if not item_data.get('product_id') or not item_data.get('quantity'):
-                    raise ValueError('Product ID and quantity are required for each item')
+                if not item_data.get('quantity'):
+                    raise ValueError('Quantity is required for each item')
                 
-                product = Product.query.get_or_404(int(item_data['product_id']))
                 quantity = int(item_data['quantity'])
-                
                 if quantity <= 0:
-                    raise ValueError(f'Invalid quantity for product {product.name}')
+                    raise ValueError(f'Invalid quantity for item')
                 
-                # For walk-in orders, use buying price as original price
-                # For online orders, use selling price as original price
-                if is_walk_in:
-                    if product.buyingprice is not None and product.buyingprice > 0:
-                        original_price = float(product.buyingprice)
-                    elif product.sellingprice is not None and product.sellingprice > 0:
-                        original_price = float(product.sellingprice)
+                # Check if this is a manual item (no product_id) or regular product
+                if item_data.get('product_id'):
+                    # Regular product - get product details from database
+                    product = Product.query.get_or_404(int(item_data['product_id']))
+                    product_name = product.name
+                    
+                    # For walk-in orders, use selling price as original price (what customer pays)
+                    # For online orders, use selling price as original price
+                    if is_walk_in:
+                        if product.sellingprice is not None and product.sellingprice > 0:
+                            original_price = float(product.sellingprice)
+                        elif product.buyingprice is not None and product.buyingprice > 0:
+                            original_price = float(product.buyingprice)
+                        else:
+                            raise ValueError(f'Product {product.name} has no valid price (selling or buying price is missing or zero)')
                     else:
-                        raise ValueError(f'Product {product.name} has no valid price (buying or selling price is missing or zero)')
-                else:
-                    if product.sellingprice is not None and product.sellingprice > 0:
-                        original_price = float(product.sellingprice)
+                        if product.sellingprice is not None and product.sellingprice > 0:
+                            original_price = float(product.sellingprice)
+                        else:
+                            raise ValueError(f'Product {product.name} has no valid selling price')
+                    
+                    # Handle negotiated price if provided
+                    negotiated_price_raw = item_data.get('negotiated_price')
+                    if negotiated_price_raw is not None:
+                        negotiated_price = float(negotiated_price_raw)
                     else:
-                        raise ValueError(f'Product {product.name} has no valid selling price')
-                
-                # Handle negotiated price if provided
-                negotiated_price_raw = item_data.get('negotiated_price')
-                if negotiated_price_raw is not None:
-                    negotiated_price = float(negotiated_price_raw)
+                        negotiated_price = original_price
+                    final_price = negotiated_price if negotiated_price != original_price else original_price
+                    negotiation_notes = item_data.get('negotiation_notes', None)
+                    
+                    order_item = OrderItem(
+                        orderid=order.id,
+                        productid=product.id,
+                        product_name=product.name,  # Use product name from database
+                        quantity=quantity,
+                        buying_price=float(product.buyingprice) if product.buyingprice is not None and product.buyingprice > 0 else None,
+                        original_price=original_price,
+                        negotiated_price=negotiated_price if negotiated_price != original_price else None,
+                        final_price=final_price,
+                        negotiation_notes=negotiation_notes or ''
+                    )
                 else:
-                    negotiated_price = original_price
-                final_price = negotiated_price if negotiated_price != original_price else original_price
-                negotiation_notes = item_data.get('negotiation_notes', None)
+                    # Manual item - use provided data
+                    product_name = item_data.get('product_name', 'Manual Item')
+                    if not product_name:
+                        raise ValueError('Product name is required for manual items')
+                    
+                    # Get price from item data
+                    price = float(item_data.get('price', 0))
+                    if price <= 0:
+                        raise ValueError(f'Valid price is required for manual item: {product_name}')
+                    
+                    # Get buying price if provided
+                    buying_price = item_data.get('buying_price')
+                    if buying_price is not None and buying_price != '':
+                        buying_price = float(buying_price)
+                    else:
+                        buying_price = None
+                    
+                    # Handle negotiated price if provided
+                    negotiated_price_raw = item_data.get('negotiated_price')
+                    if negotiated_price_raw is not None and negotiated_price_raw != '':
+                        negotiated_price = float(negotiated_price_raw)
+                    else:
+                        negotiated_price = price
+                    
+                    final_price = negotiated_price
+                    negotiation_notes = item_data.get('negotiation_notes', None)
+                    
+                    order_item = OrderItem(
+                        orderid=order.id,
+                        productid=None,  # Manual items have no product ID
+                        product_name=product_name,  # Use product name from item data
+                        quantity=quantity,
+                        buying_price=buying_price,
+                        original_price=price,
+                        negotiated_price=negotiated_price if negotiated_price != price else None,
+                        final_price=final_price,
+                        negotiation_notes=negotiation_notes or ''
+                    )
                 
-                order_item = OrderItem(
-                    orderid=order.id,
-                    productid=product.id,
-                    quantity=quantity,
-                    buying_price=float(product.buyingprice) if product.buyingprice is not None and product.buyingprice > 0 else None,
-                    original_price=original_price,
-                    negotiated_price=negotiated_price if negotiated_price != original_price else None,
-                    final_price=final_price,
-                    negotiation_notes=negotiation_notes or ''
-                )
                 db.session.add(order_item)
                 total_amount += final_price * quantity
             
@@ -242,37 +307,84 @@ class OrderService:
             total_amount = 0
             
             for item_data in items_data:
-                if not item_data.get('product_id') or not item_data.get('quantity'):
-                    raise ValueError('Product ID and quantity are required for each item')
+                if not item_data.get('quantity'):
+                    raise ValueError('Quantity is required for each item')
                 
-                product = Product.query.get_or_404(int(item_data['product_id']))
                 quantity = int(item_data['quantity'])
-                
                 if quantity <= 0:
-                    raise ValueError(f'Invalid quantity for product {product.name}')
+                    raise ValueError(f'Invalid quantity for item')
                 
-                # Check stock availability
-                if product.stock < quantity:
-                    raise ValueError(f'Insufficient stock for {product.name} (required: {quantity}, available: {product.stock})')
-                
-                # Calculate prices
-                original_price = float(product.sellingprice or 0)
-                negotiated_price = float(item_data.get('negotiated_price', original_price)) if item_data.get('negotiated_price') else None
-                final_price = negotiated_price if negotiated_price is not None else original_price
+                # Check if this is a manual item (no product_id) or regular product
+                if item_data.get('product_id'):
+                    # Regular product - get product details from database
+                    product = Product.query.get_or_404(int(item_data['product_id']))
+                    product_name = product.name
+                    
+                    # Check stock availability (allow zero stock sales with warning)
+                    if product.stock < quantity:
+                        # Allow the order but log a warning about insufficient stock
+                        print(f"Warning: Ordering {quantity} units of {product.name} but only {product.stock} available in stock")
+                        # You could also add this to a warnings log or notification system
+                    
+                    # Calculate prices
+                    original_price = float(product.sellingprice or 0)
+                    negotiated_price = float(item_data.get('negotiated_price', original_price)) if item_data.get('negotiated_price') else None
+                    final_price = negotiated_price if negotiated_price is not None else original_price
+                    
+                    # Create new order item
+                    order_item = OrderItem(
+                        orderid=order.id,
+                        productid=product.id,
+                        product_name=product.name,  # Use product name from database
+                        quantity=quantity,
+                        buying_price=float(product.buyingprice) if product.buyingprice is not None and product.buyingprice > 0 else None,
+                        original_price=original_price,
+                        negotiated_price=negotiated_price,
+                        final_price=final_price,
+                        negotiation_notes=item_data.get('negotiation_notes')
+                    )
+                else:
+                    # Manual item - use provided data
+                    product_name = item_data.get('product_name', 'Manual Item')
+                    if not product_name:
+                        raise ValueError('Product name is required for manual items')
+                    
+                    # Get price from item data
+                    price = float(item_data.get('price', 0))
+                    if price <= 0:
+                        raise ValueError(f'Valid price is required for manual item: {product_name}')
+                    
+                    # Get buying price if provided
+                    buying_price = item_data.get('buying_price')
+                    if buying_price is not None and buying_price != '':
+                        buying_price = float(buying_price)
+                    else:
+                        buying_price = None
+                    
+                    # Handle negotiated price if provided
+                    negotiated_price_raw = item_data.get('negotiated_price')
+                    if negotiated_price_raw is not None and negotiated_price_raw != '':
+                        negotiated_price = float(negotiated_price_raw)
+                    else:
+                        negotiated_price = price
+                    
+                    final_price = negotiated_price
+                    
+                    # Create new order item
+                    order_item = OrderItem(
+                        orderid=order.id,
+                        productid=None,  # Manual items have no product ID
+                        product_name=product_name,  # Use product name from item data
+                        quantity=quantity,
+                        buying_price=buying_price,
+                        original_price=price,
+                        negotiated_price=negotiated_price if negotiated_price != price else None,
+                        final_price=final_price,
+                        negotiation_notes=item_data.get('negotiation_notes')
+                    )
                 
                 item_total = quantity * final_price
                 total_amount += item_total
-                
-                # Create new order item
-                order_item = OrderItem(
-                    orderid=order.id,
-                    productid=product.id,
-                    quantity=quantity,
-                    original_price=original_price,
-                    negotiated_price=negotiated_price,
-                    final_price=final_price,
-                    negotiation_notes=item_data.get('negotiation_notes')
-                )
                 db.session.add(order_item)
             
             # Update order
@@ -298,10 +410,14 @@ class OrderService:
             # Check if there are any actual changes
             if order_item.final_price is not None:
                 current_price = float(order_item.final_price)
-            elif order_item.product.sellingprice is not None:
+            elif order_item.productid and order_item.product and order_item.product.sellingprice is not None:
+                # Regular product with selling price
                 current_price = float(order_item.product.sellingprice)
+            elif order_item.original_price is not None:
+                # Manual item or fallback to original price
+                current_price = float(order_item.original_price)
             else:
-                return False, 'Product has no valid selling price'
+                return False, 'Item has no valid price'
             current_notes = order_item.negotiation_notes or ''
             
             # Check if price or notes have actually changed
@@ -323,8 +439,12 @@ class OrderService:
             for item in order.order_items:
                 if item.final_price is not None:
                     item_price = float(item.final_price)
-                elif item.product.sellingprice is not None:
+                elif item.productid and item.product and item.product.sellingprice is not None:
+                    # Regular product with selling price
                     item_price = float(item.product.sellingprice)
+                elif item.original_price is not None:
+                    # Manual item or fallback to original price
+                    item_price = float(item.original_price)
                 else:
                     item_price = 0.0
                 total_amount += item.quantity * item_price
@@ -376,15 +496,17 @@ class PaymentService:
             # Calculate balance and create receipt (keep this synchronous for immediate feedback)
             try:
                 # Calculate total order amount
-                total_order_amount = 0
+                total_amount = 0
                 for item in order.order_items:
                     if item.final_price is not None:
                         item_price = float(item.final_price)
-                    elif item.product.sellingprice is not None:
+                    elif item.original_price is not None:
+                        item_price = float(item.original_price)
+                    elif item.productid and item.product and item.product.sellingprice is not None:
                         item_price = float(item.product.sellingprice)
                     else:
                         item_price = 0.0
-                    total_order_amount += item.quantity * item_price
+                    total_amount += item.quantity * item_price
                 
                 # Calculate previous balance (total amount minus previous payments)
                 previous_payments = Payment.query.filter_by(
@@ -392,7 +514,7 @@ class PaymentService:
                     payment_status='completed'
                 ).filter(Payment.id != payment.id).with_entities(db.func.sum(Payment.amount)).scalar() or 0
                 
-                previous_balance = float(total_order_amount) - float(previous_payments)
+                previous_balance = float(total_amount) - float(previous_payments)
                 remaining_balance = previous_balance - float(amount)
                 
                 # Create receipt

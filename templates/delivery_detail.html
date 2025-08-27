@@ -123,7 +123,15 @@
                 <tbody>
                     {% for item in delivery.order.order_items %}
                     <tr>
-                        <td>{{ item.product.name }}</td>
+                        <td>
+                            {% if item.product_name %}
+                                {{ item.product_name }}
+                            {% elif item.product %}
+                                {{ item.product.name }}
+                            {% else %}
+                                Manual Item
+                            {% endif %}
+                        </td>
                         <td>{{ item.quantity }}</td>
                         <td>KSh{{ "%.2f"|format(item.final_price) }}</td>
                         <td>KSh{{ "%.2f"|format(item.final_price * item.quantity) }}</td>

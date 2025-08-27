@@ -119,8 +119,16 @@
                                 {% for item in quotation.items %}
                                 <tr>
                                     <td>
-                                        <strong>{{ item.product.name }}</strong>
-                                        {% if item.product.productcode %}
+                                        <strong>
+                                            {% if item.product_name %}
+                                                {{ item.product_name }}
+                                            {% elif item.product %}
+                                                {{ item.product.name }}
+                                            {% else %}
+                                                Manual Item
+                                            {% endif %}
+                                        </strong>
+                                        {% if item.product and item.product.productcode %}
                                         <br><small class="text-muted">Code: {{ item.product.productcode }}</small>
                                         {% endif %}
                                     </td>

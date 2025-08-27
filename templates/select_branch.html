@@ -42,8 +42,22 @@
                     {% for item_data in order_items_with_branches %}
                     <div class="card mb-4">
                         <div class="card-header">
-                            <h6 class="mb-0">{{ item_data.item.product.name }}</h6>
-                            <small class="text-muted">Quantity: {{ item_data.item.quantity }} | Price: KSh{{ "%.2f"|format(item_data.item.product.sellingprice) }}</small>
+                            <h6 class="mb-0">
+                                {% if item_data.item.product_name %}
+                                    {{ item_data.item.product_name }}
+                                {% elif item_data.item.product %}
+                                    {{ item_data.item.product.name }}
+                                {% else %}
+                                    Manual Item
+                                {% endif %}
+                            </h6>
+                            <small class="text-muted">
+                                Quantity: {{ item_data.item.quantity }} | 
+                                Price: KSh{{ "%.2f"|format(
+                                    item_data.item.original_price if item_data.item.original_price 
+                                    else (item_data.item.product.sellingprice if item_data.item.product else 0)
+                                ) }}
+                            </small>
                         </div>
                         <div class="card-body">
                             <div class="row">
@@ -117,7 +131,13 @@ document.getElementById('branchSelectionForm').addEventListener('submit', functi
         itemBranchSelections['{{ item_data.item.id }}'] = selectedBranch_{{ item_data.item.id }}.value;
     } else {
         allItemsHaveSelection = false;
+        {% if item_data.item.product_name %}
+        missingSelections.push('{{ item_data.item.product_name }}');
+        {% elif item_data.item.product %}
         missingSelections.push('{{ item_data.item.product.name }}');
+        {% else %}
+        missingSelections.push('Manual Item');
+        {% endif %}
     }
     {% endfor %}
     

@@ -83,7 +83,15 @@
                             <tbody>
                                 {% for item in receipt.order.order_items %}
                                 <tr>
-                                    <td>{{ item.product.name }}</td>
+                                    <td>
+                                        {% if item.product_name %}
+                                            {{ item.product_name }}
+                                        {% elif item.product %}
+                                            {{ item.product.name }}
+                                        {% else %}
+                                            Manual Item
+                                        {% endif %}
+                                    </td>
                                     <td class="text-center">{{ item.quantity }}</td>
                                     <td class="text-end">KSh{{ "%.2f"|format(item.final_price) }}</td>
                                     <td class="text-end">KSh{{ "%.2f"|format(item.quantity * item.final_price) }}</td>

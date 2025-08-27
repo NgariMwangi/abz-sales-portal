@@ -276,9 +276,10 @@ def generate_invoice_pdf(invoice_id):
     
     # Calculate totals and prepare items
     for item in order.order_items:
+        # Use final_price for calculations (includes negotiated prices)
         if item.final_price is not None:
             final_price = float(item.final_price)
-        elif item.product.sellingprice is not None:
+        elif item.productid and item.product and item.product.sellingprice is not None:
             final_price = float(item.product.sellingprice)
         else:
             final_price = 0.0
@@ -286,8 +287,16 @@ def generate_invoice_pdf(invoice_id):
         item_total = item.quantity * final_price
         invoice_data['subtotal'] += item_total
         
+        # Get product name - use product_name field if available, otherwise fall back to product.name
+        if item.product_name:
+            product_name = item.product_name
+        elif item.productid and item.product:
+            product_name = item.product.name
+        else:
+            product_name = "Manual Item"
+        
         invoice_data['order_items'].append({
-            'product_name': item.product.name,
+            'product_name': product_name,
             'quantity': item.quantity,
             'unit_price': final_price,
             'total': item_total
@@ -468,7 +477,14 @@ def create_quotation_pdf(quotation, user_data, output_path):
         
         # Add items
         for item in quotation.items:
-            product_name = item.product.name if item.product else 'N/A'
+            # Get product name - use product_name field if available, otherwise fall back to product.name
+            if hasattr(item, 'product_name') and item.product_name:
+                product_name = item.product_name
+            elif item.product and hasattr(item.product, 'name'):
+                product_name = item.product.name
+            else:
+                product_name = 'N/A'
+            
             quantity = item.quantity
             unit_price = item.unit_price
             total = item.unit_price * item.quantity

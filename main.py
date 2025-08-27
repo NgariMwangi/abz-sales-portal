@@ -158,11 +158,27 @@ def orders_page():
     for order in orders_list:
         order_items = []
         for item in order.order_items:
+            # Get product name - use product_name field if available, otherwise fall back to product.name
+            if item.product_name:
+                product_name = item.product_name
+            elif item.productid and item.product:
+                product_name = item.product.name
+            else:
+                product_name = "Manual Item"
+            
+            # Get product price - use original_price if available, otherwise fall back to product.sellingprice
+            if item.original_price is not None:
+                product_price = item.original_price
+            elif item.productid and item.product and item.product.sellingprice is not None:
+                product_price = item.product.sellingprice
+            else:
+                product_price = 0.0
+            
             order_items.append({
                 'id': item.id,
-                'product_name': item.product.name,
+                'product_name': product_name,
                 'quantity': item.quantity,
-                'price': item.product.sellingprice
+                'price': product_price
             })
         orders_data.append({
             'id': order.id,
@@ -233,14 +249,22 @@ def order_detail(order_id):
         # Handle final price for display
         if item.final_price is not None:
             display_final_price = float(item.final_price)
-        elif item.product.sellingprice is not None:
+        elif item.productid and item.product and item.product.sellingprice is not None:
             display_final_price = float(item.product.sellingprice)
         else:
             display_final_price = 0.0
         
+        # Get product name - use product_name field if available, otherwise fall back to product.name
+        if item.product_name:
+            product_name = item.product_name
+        elif item.productid and item.product:
+            product_name = item.product.name
+        else:
+            product_name = "Manual Item"
+        
         order_data['order_items'].append({
             'id': item.id,
-            'product_name': item.product.name,
+            'product_name': product_name,
             'quantity': item.quantity,
             'original_price': original_price,
             'negotiated_price': float(item.negotiated_price) if item.negotiated_price else None,
@@ -288,7 +312,7 @@ def view_order_invoice(order_id):
         # Use final_price for calculations (includes negotiated prices)
         if item.final_price is not None:
             final_price = float(item.final_price)
-        elif item.product.sellingprice is not None:
+        elif item.productid and item.product and item.product.sellingprice is not None:
             final_price = float(item.product.sellingprice)
         else:
             final_price = 0.0
@@ -296,8 +320,16 @@ def view_order_invoice(order_id):
         item_total = item.quantity * final_price
         invoice_data['subtotal'] += item_total
         
+        # Get product name - use product_name field if available, otherwise fall back to product.name
+        if item.product_name:
+            product_name = item.product_name
+        elif item.productid and item.product:
+            product_name = item.product.name
+        else:
+            product_name = "Manual Item"
+        
         invoice_data['order_items'].append({
-            'product_name': item.product.name,
+            'product_name': product_name,
             'quantity': item.quantity,
             'unit_price': final_price,
             'total': item_total
@@ -560,12 +592,28 @@ def edit_order(order_id):
     }
     
     for item in order.order_items:
+        # Get product name - use product_name field if available, otherwise fall back to product.name
+        if item.product_name:
+            product_name = item.product_name
+        elif item.productid and item.product:
+            product_name = item.product.name
+        else:
+            product_name = "Manual Item"
+        
+        # Get product price - use original_price if available, otherwise fall back to product.sellingprice
+        if item.original_price is not None:
+            product_price = item.original_price
+        elif item.productid and item.product and item.product.sellingprice is not None:
+            product_price = item.product.sellingprice
+        else:
+            product_price = 0.0
+        
         order_data['order_items'].append({
             'id': item.id,
             'product_id': item.productid,
-            'product_name': item.product.name,
+            'product_name': product_name,
             'quantity': item.quantity,
-            'price': item.product.sellingprice,
+            'price': product_price,
             'negotiated_price': float(item.negotiated_price) if item.negotiated_price else None,
             'negotiation_notes': item.negotiation_notes
         })
@@ -1373,7 +1421,7 @@ def negotiate_order_prices(order_id):
         # Handle None values for price fields
         if item.original_price is not None:
             original_price = float(item.original_price)
-        elif item.product.sellingprice is not None:
+        elif item.productid and item.product and item.product.sellingprice is not None:
             original_price = float(item.product.sellingprice)
         else:
             original_price = 0.0
@@ -1385,9 +1433,17 @@ def negotiate_order_prices(order_id):
         else:
             final_price = original_price
         
+        # Get product name - use product_name field if available, otherwise fall back to product.name
+        if item.product_name:
+            product_name = item.product_name
+        elif item.productid and item.product:
+            product_name = item.product.name
+        else:
+            product_name = "Manual Item"
+        
         order_items_data.append({
             'id': item.id,
-            'product_name': item.product.name,
+            'product_name': product_name,
             'quantity': item.quantity,
             'original_price': original_price,
             'negotiated_price': negotiated_price,

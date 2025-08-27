@@ -45,14 +45,24 @@
     }
     
     /* Search input styling */
-    #product_search:focus {
-        border-color: #0d6efd;
-        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    .searching {
+        border-color: #0d6efd !important;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
+    }
+    
+    .searching::placeholder {
+        color: #0d6efd;
+        font-weight: 500;
     }
     
     #product_search.is-valid {
         border-color: #198754;
         box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
+    }
+    
+    #product_search:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
     }
     
     /* Button transitions */
@@ -79,6 +89,74 @@
     
     #product_count .text-muted {
         color: #6c757d !important;
+    }
+    
+    /* Manual item styling */
+    .table-warning {
+        background-color: rgba(255, 193, 7, 0.1) !important;
+    }
+    
+    .table-warning:hover {
+        background-color: rgba(255, 193, 7, 0.2) !important;
+    }
+    
+    .manual-item-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    /* Backorder styling */
+    .table-danger {
+        background-color: #f8d7da !important;
+    }
+    
+    .table-danger:hover {
+        background-color: #f5c6cb !important;
+    }
+    
+    .badge.bg-danger {
+        font-size: 0.75em;
+        padding: 0.25em 0.5em;
+    }
+    
+    /* Manual item form styling */
+    .manual-item-section {
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+    }
+    
+    .manual-item-section h6 {
+        color: #6c757d;
+        font-weight: 600;
+    }
+    
+    /* Order summary styling */
+    .order-summary .border {
+        transition: all 0.3s ease;
+    }
+    
+    .order-summary .border:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    .order-summary .text-info {
+        color: #0dcaf0 !important;
+    }
+    
+    /* Profit display styling */
+    #totalProfit {
+        font-weight: 700;
+    }
+    
+    .profit-positive {
+        color: #198754 !important;
+    }
+    
+    .profit-negative {
+        color: #dc3545 !important;
     }
 </style>
 {% endblock %}
@@ -147,6 +225,11 @@
                         </select>
                         <div class="form-text">
                             <span id="product_count" class="product-count-info">Please select a branch above to view available products</span>
+                            <br>
+                            <small class="text-info">
+                                <i class="bi bi-info-circle me-1"></i>
+                                You can sell products even with zero stock - the system will create backorders automatically.
+                            </small>
                         </div>
                     </div>
                     <div class="mb-3">
@@ -154,6 +237,45 @@
                         <input type="number" class="form-control" id="quantity" min="1" value="1">
                     </div>
                     <button type="button" class="btn btn-primary" onclick="addProduct()">Add Product</button>
+                    
+                    <!-- Manual Item Section -->
+                    <hr class="my-4">
+                    <div class="mb-3 manual-item-section">
+                        <h6 class="text-muted mb-3">
+                            <i class="bi bi-plus-circle me-2"></i>Add Manual Item
+                        </h6>
+                        <div class="form-text mb-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Use this option to add items that are not in your product catalog (e.g., custom services, special orders, or one-time items).
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="manual_item_name" class="form-label">Item Name *</label>
+                                <input type="text" class="form-control" id="manual_item_name" placeholder="Enter item name">
+                            </div>
+                            <div class="col-md-2">
+                                <label for="manual_quantity" class="form-label">Quantity *</label>
+                                <input type="number" class="form-control" id="manual_quantity" min="1" value="1">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="manual_buying_price" class="form-label">Buying Price (KSh)</label>
+                                <input type="number" class="form-control" id="manual_buying_price" min="0" step="0.01" placeholder="Cost price">
+                                <div class="form-text small">Leave empty if not applicable</div>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="manual_price" class="form-label">Selling Price (KSh) *</label>
+                                <input type="number" class="form-control" id="manual_price" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-outline-primary" onclick="addManualItem()">
+                                <i class="bi bi-plus-circle me-2"></i>Add Manual Item
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary ms-2" onclick="clearManualItemForm()">
+                                <i class="bi bi-x-circle me-2"></i>Clear Form
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -164,6 +286,42 @@
             <h5 class="mb-0">Order Items</h5>
         </div>
         <div class="card-body">
+            <!-- Order Summary -->
+            <div id="orderSummary" class="mb-3 order-summary" style="display: none;">
+                <div class="row text-center">
+                    <div class="col-md-2">
+                        <div class="border rounded p-2">
+                            <div class="h5 text-primary mb-1" id="totalItems">0</div>
+                            <small class="text-muted">Total Items</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="border rounded p-2">
+                            <div class="h5 text-success mb-1" id="regularItems">0</div>
+                            <small class="text-muted">Regular Products</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="border rounded p-2">
+                            <div class="h5 text-warning mb-1" id="manualItems">0</div>
+                            <small class="text-muted">Manual Items</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-2">
+                            <div class="h5 text-danger mb-1" id="backorderItems">0</div>
+                            <small class="text-muted">Backorders</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border rounded p-2">
+                            <div class="h5 mb-1" id="totalProfit">KSh0.00</div>
+                            <small class="text-muted">Total Profit</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <div id="orderItems">
                 <p class="text-muted">No items added yet. Add products to create your walk-in order.</p>
             </div>
@@ -214,17 +372,23 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Set new timeout for debounced search
         searchTimeout = setTimeout(() => {
-            if (this.value.trim() !== searchQuery) {
+            const currentValue = this.value.trim();
+            if (currentValue !== searchQuery) {
                 performSearch();
             }
-        }, 300); // 300ms delay
+        }, 500); // Increased to 500ms for better user experience
     });
     
-    // Enter key in search input
-    searchInput.addEventListener('keypress', function(e) {
+    // Prevent search on every keystroke for better typing experience
+    searchInput.addEventListener('keydown', function(e) {
+        // Allow normal typing keys
         if (e.key === 'Enter') {
             e.preventDefault();
             performSearch();
+        }
+        // Don't search on backspace, delete, arrow keys, etc.
+        if (['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab'].includes(e.key)) {
+            return;
         }
     });
 });
@@ -234,7 +398,14 @@ function performSearch() {
     const searchBtn = document.getElementById('searchBtn');
     const clearSearchBtn = document.getElementById('clearSearchBtn');
     
-    searchQuery = searchInput.value.trim();
+    const newSearchQuery = searchInput.value.trim();
+    
+    // Only perform search if query actually changed
+    if (newSearchQuery === searchQuery) {
+        return;
+    }
+    
+    searchQuery = newSearchQuery;
     
     // Update UI based on search state
     if (searchQuery) {
@@ -245,10 +416,13 @@ function performSearch() {
         // Show loading state in clear button temporarily
         clearSearchBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Searching...';
         clearSearchBtn.disabled = true;
+        
+        // Add visual feedback to search input
+        searchInput.classList.add('searching');
     } else {
         searchBtn.style.display = 'block';
         clearSearchBtn.style.display = 'none';
-        searchInput.classList.remove('is-valid');
+        searchInput.classList.remove('is-valid', 'searching');
     }
     
     // Load products with search
@@ -260,13 +434,14 @@ function clearSearch() {
     const searchBtn = document.getElementById('searchBtn');
     const clearSearchBtn = document.getElementById('clearSearchBtn');
     
+    // Clear the search input
     searchInput.value = '';
     searchQuery = '';
     
     // Reset UI
     searchBtn.style.display = 'block';
     clearSearchBtn.style.display = 'none';
-    searchInput.classList.remove('is-valid');
+    searchInput.classList.remove('is-valid', 'searching');
     searchInput.focus();
     
     // Load products without search
@@ -287,10 +462,6 @@ function loadProducts() {
     // Show loading state
     const productCount = document.getElementById('product_count');
     productCount.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Loading products...';
-    
-    // Disable search input during loading
-    const searchInput = document.getElementById('product_search');
-    searchInput.disabled = true;
     
     // Build API URL
     const params = new URLSearchParams();
@@ -336,10 +507,6 @@ function loadProducts() {
                 clearSearchBtn.innerHTML = '<i class="bi bi-x"></i> Clear';
                 clearSearchBtn.disabled = false;
             }
-        })
-        .finally(() => {
-            // Re-enable search input
-            searchInput.disabled = false;
         });
 }
 
@@ -428,8 +595,15 @@ function addProduct() {
     }
     
     if (quantity > product.stock) {
-        alert(`Only ${product.stock} units available in stock.`);
-        return;
+        // Allow the order but show a warning about insufficient stock
+        const confirmLowStock = confirm(
+            `Warning: You're ordering ${quantity} units of ${product.name}, but only ${product.stock} are available in stock.\n\n` +
+            `This will create a backorder. Do you want to continue?`
+        );
+        
+        if (!confirmLowStock) {
+            return;
+        }
     }
     
     // Check if product already exists in order
@@ -437,8 +611,16 @@ function addProduct() {
     if (existingItem) {
         existingItem.quantity += quantity;
         if (existingItem.quantity > product.stock) {
-            alert(`Total quantity (${existingItem.quantity}) exceeds available stock (${product.stock}).`);
-            existingItem.quantity = product.stock;
+            // Show warning for total quantity exceeding stock
+            const confirmTotalLowStock = confirm(
+                `Warning: Total quantity (${existingItem.quantity}) now exceeds available stock (${product.stock}).\n\n` +
+                `This will create a backorder. Do you want to continue?`
+            );
+            
+            if (!confirmTotalLowStock) {
+                existingItem.quantity -= quantity; // Revert the addition
+                return;
+            }
         }
     } else {
         orderItems.push({
@@ -446,6 +628,7 @@ function addProduct() {
             product_name: product.name,
             quantity: quantity,
             price: product.selling_price,
+            buying_price: product.buyingprice || 0,
             negotiated_price: null,
             negotiation_notes: null
         });
@@ -459,6 +642,87 @@ function addProduct() {
     document.getElementById('quantity').value = '1';
 }
 
+function addManualItem() {
+    const itemName = document.getElementById('manual_item_name').value.trim();
+    const quantity = parseInt(document.getElementById('manual_quantity').value);
+    const buyingPrice = parseFloat(document.getElementById('manual_buying_price').value) || 0;
+    const price = parseFloat(document.getElementById('manual_price').value);
+
+    if (!itemName) {
+        alert('Item name cannot be empty.');
+        document.getElementById('manual_item_name').focus();
+        return;
+    }
+
+    if (!quantity || quantity < 1) {
+        alert('Quantity must be at least 1.');
+        document.getElementById('manual_quantity').focus();
+        return;
+    }
+
+    if (!price || price < 0) {
+        alert('Selling price must be a positive number.');
+        document.getElementById('manual_price').focus();
+        return;
+    }
+
+    // Check if item already exists in order (case-insensitive)
+    const existingItem = orderItems.find(item => 
+        item.product_name.toLowerCase() === itemName.toLowerCase()
+    );
+    
+    if (existingItem) {
+        const confirmAdd = confirm(`Item "${itemName}" already exists in the order. Do you want to add ${quantity} more units?`);
+        if (confirmAdd) {
+            existingItem.quantity += quantity;
+            updateOrderItemsDisplay();
+            updateTotal();
+            clearManualItemForm();
+        }
+        return;
+    }
+
+    // Add new manual item
+    orderItems.push({
+        product_id: null, // No direct product ID for manual items
+        product_name: itemName,
+        quantity: quantity,
+        price: price,
+        buying_price: buyingPrice,
+        negotiated_price: null,
+        negotiation_notes: null
+    });
+
+    updateOrderItemsDisplay();
+    updateTotal();
+    clearManualItemForm();
+    
+    // Show success message
+    const successMsg = document.createElement('div');
+    successMsg.className = 'alert alert-success alert-dismissible fade show mt-2';
+    successMsg.innerHTML = `
+        <i class="bi bi-check-circle me-2"></i>
+        Manual item "${itemName}" added successfully!
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.querySelector('.manual-item-section').appendChild(successMsg);
+    
+    // Auto-remove success message after 3 seconds
+    setTimeout(() => {
+        if (successMsg.parentNode) {
+            successMsg.remove();
+        }
+    }, 3000);
+}
+
+function clearManualItemForm() {
+    document.getElementById('manual_item_name').value = '';
+    document.getElementById('manual_quantity').value = '1';
+    document.getElementById('manual_buying_price').value = '';
+    document.getElementById('manual_price').value = '';
+    document.getElementById('manual_item_name').focus();
+}
+
 function removeProduct(index) {
     orderItems.splice(index, 1);
     updateOrderItemsDisplay();
@@ -467,11 +731,31 @@ function removeProduct(index) {
 
 function updateOrderItemsDisplay() {
     const container = document.getElementById('orderItems');
+    const summaryDiv = document.getElementById('orderSummary');
     
     if (orderItems.length === 0) {
         container.innerHTML = '<p class="text-muted">No items added yet.</p>';
+        summaryDiv.style.display = 'none';
         return;
     }
+    
+    // Update summary
+    const regularItems = orderItems.filter(item => item.product_id !== null).length;
+    const manualItems = orderItems.filter(item => item.product_id === null).length;
+    const totalItems = orderItems.length;
+    
+    // Count backorder items
+    const backorderItems = orderItems.filter(item => {
+        if (item.product_id === null) return false; // Skip manual items
+        const product = products.find(p => p.id === item.product_id);
+        return product && item.quantity > product.stock;
+    }).length;
+    
+    document.getElementById('totalItems').textContent = totalItems;
+    document.getElementById('regularItems').textContent = regularItems;
+    document.getElementById('manualItems').textContent = manualItems;
+    document.getElementById('backorderItems').textContent = backorderItems;
+    summaryDiv.style.display = 'block';
     
     let html = `
         <table class="table table-striped">
@@ -479,7 +763,8 @@ function updateOrderItemsDisplay() {
                 <tr>
                     <th>Product</th>
                     <th>Quantity</th>
-                    <th>Original Price</th>
+                    <th>Buying Price</th>
+                    <th>Selling Price</th>
                     <th>Negotiated Price</th>
                     <th>Final Price</th>
                     <th>Total</th>
@@ -493,10 +778,40 @@ function updateOrderItemsDisplay() {
     orderItems.forEach((item, index) => {
         const finalPrice = item.negotiated_price || item.price;
         const total = item.quantity * finalPrice;
+        const isManualItem = item.product_id === null;
+        const buyingPrice = item.buying_price || 0;
+        
+        // Check if this is a backorder (regular product with quantity exceeding stock)
+        let isBackorder = false;
+        let availableStock = 0;
+        if (!isManualItem && item.product_id) {
+            const product = products.find(p => p.id === item.product_id);
+            if (product && item.quantity > product.stock) {
+                isBackorder = true;
+                availableStock = product.stock;
+            }
+        }
+        
+        // Determine row class based on item type and stock status
+        let rowClass = '';
+        if (isManualItem) {
+            rowClass = 'table-warning';
+        } else if (isBackorder) {
+            rowClass = 'table-danger';
+        }
+        
         html += `
-            <tr>
-                <td>${item.product_name}</td>
-                <td>${item.quantity}</td>
+            <tr class="${rowClass}">
+                <td>
+                    ${item.product_name}
+                    ${isManualItem ? '<span class="badge bg-warning text-dark ms-2">Manual</span>' : ''}
+                    ${isBackorder ? '<span class="badge bg-danger ms-2">Backorder</span>' : ''}
+                </td>
+                <td>
+                    ${item.quantity}
+                    ${isBackorder ? `<br><small class="text-danger">(${availableStock} in stock)</small>` : ''}
+                </td>
+                <td>KSh${buyingPrice.toFixed(2)}</td>
                 <td>KSh${item.price.toFixed(2)}</td>
                 <td>
                     <input type="number" 
@@ -550,6 +865,20 @@ function updateTotal() {
     document.getElementById('totalAmount').textContent = total.toFixed(2);
     document.getElementById('orderItemsData').value = JSON.stringify(orderItems);
     document.getElementById('createOrderBtn').disabled = orderItems.length === 0;
+
+    // Calculate total profit
+    const totalProfit = orderItems.reduce((sum, item) => {
+        const buyingPrice = item.buying_price || 0;
+        const sellingPrice = item.negotiated_price || item.price;
+        return sum + (sellingPrice - buyingPrice) * item.quantity;
+    }, 0);
+    document.getElementById('totalProfit').textContent = `KSh${totalProfit.toFixed(2)}`;
+    document.getElementById('totalProfit').classList.remove('profit-positive', 'profit-negative');
+    if (totalProfit >= 0) {
+        document.getElementById('totalProfit').classList.add('profit-positive');
+    } else {
+        document.getElementById('totalProfit').classList.add('profit-negative');
+    }
 }
 
 // Handle form submission
@@ -630,6 +959,8 @@ document.getElementById('branch_id').addEventListener('change', function() {
     document.getElementById('orderItemsData').value = '[]';
     document.getElementById('createOrderBtn').disabled = true;
     document.getElementById('product_count').textContent = 'Please select a branch above to view available products';
+    document.getElementById('totalProfit').textContent = 'KSh0.00'; // Reset profit
+    document.getElementById('totalProfit').classList.remove('profit-positive', 'profit-negative');
     
     // Load products for the new branch
     loadProducts();
