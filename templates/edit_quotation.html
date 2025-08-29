@@ -2,6 +2,31 @@
 
 {% block title %}Edit Quotation{% endblock %}
 
+{% block head %}
+<style>
+    /* Manual item styling */
+    .manual-item-section {
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+    }
+    
+    .table-warning {
+        background-color: #fff3cd !important;
+    }
+    
+    .table-warning:hover {
+        background-color: #ffeaa7 !important;
+    }
+    
+    .badge.bg-warning {
+        font-size: 0.75em;
+        padding: 0.25em 0.5em;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -95,53 +120,93 @@
             </div>
         </div>
 
+        <!-- Manual Item Entry -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Manual Item Entry</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label for="manual_item_name" class="form-label">Item Name *</label>
+                        <input type="text" class="form-control" id="manual_item_name" placeholder="Enter item name...">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="manual_quantity" class="form-label">Quantity</label>
+                        <input type="number" class="form-control" id="manual_quantity" value="1" min="1">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="manual_unit_price" class="form-label">Unit Price (KSh)</label>
+                        <input type="number" class="form-control" id="manual_unit_price" step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="manual_item_notes" class="form-label">Notes</label>
+                        <input type="text" class="form-control" id="manual_item_notes" placeholder="Notes for this item...">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-warning w-100" onclick="addManualItem()">
+                            <i class="fas fa-plus"></i> Add Manual Item
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Quotation Items -->
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0">Quotation Items</h5>
             </div>
             <div class="card-body">
-                <div id="quotationItems">
-                    {% for item in quotation.items %}
-                    <div class="quotation-item border rounded p-3 mb-3" data-item-id="{{ item.id }}">
-                        <div class="row">
-                            <div class="col-md-3">
-                                <label class="form-label">Product</label>
-                                <select class="form-select" name="item_id[]" required>
-                                    <option value="">Select Product</option>
-                                    {% for product in products %}
-                                    <option value="{{ product.id }}" {% if product.id == item.product_id %}selected{% endif %}>
-                                        {{ product.name }} - {{ product.productcode or 'No Code' }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">Quantity</label>
-                                <input type="number" class="form-control" name="quantity[]" value="{{ item.quantity }}" min="1" required>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">Unit Price</label>
-                                <input type="number" class="form-control" name="unit_price[]" value="{{ item.unit_price }}" step="0.01" min="0" required>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">Total</label>
-                                <input type="text" class="form-control" value="KSh{{ "%.2f"|format(item.total_price) }}" readonly>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label">Notes</label>
-                                <input type="text" class="form-control" name="notes[]" value="{{ item.notes or '' }}">
-                            </div>
-                            <div class="col-md-1">
-                                <label class="form-label">Remove</label>
-                                <button type="button" class="btn btn-danger btn-sm w-100 remove-item-btn" title="Remove this item">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
+                                 <div id="quotationItems">
+                     {% for item in quotation.items %}
+                     <div class="quotation-item border rounded p-3 mb-3" data-item-id="{{ item.id }}">
+                         <div class="row">
+                             <div class="col-md-3">
+                                 <label class="form-label">Product</label>
+                                 {% if item.product_id %}
+                                     <!-- Regular product - show dropdown -->
+                                     <select class="form-select" name="item_id[]" required>
+                                         <option value="">Select Product</option>
+                                         {% for product in products %}
+                                         <option value="{{ product.id }}" {% if product.id == item.product_id %}selected{% endif %}>
+                                             {{ product.name }} - {{ product.productcode or 'No Code' }}
+                                         </option>
+                                         {% endfor %}
+                                     </select>
+                                 {% else %}
+                                     <!-- Manual item - show readonly text input -->
+                                     <input type="text" class="form-control" name="item_name[]" value="{{ item.product_name or 'Manual Item' }}" readonly>
+                                     <input type="hidden" name="item_id[]" value="">
+                                 {% endif %}
+                             </div>
+                             <div class="col-md-2">
+                                 <label class="form-label">Quantity</label>
+                                 <input type="number" class="form-control" name="quantity[]" value="{{ item.quantity }}" min="1" required>
+                             </div>
+                             <div class="col-md-2">
+                                 <label class="form-label">Unit Price</label>
+                                 <input type="number" class="form-control" name="unit_price[]" value="{{ item.unit_price }}" step="0.01" min="0" required>
+                             </div>
+                             <div class="col-md-2">
+                                 <label class="form-label">Total</label>
+                                 <input type="text" class="form-control" value="KSh{{ "%.2f"|format(item.total_price) }}" readonly>
+                             </div>
+                             <div class="col-md-2">
+                                 <label class="form-label">Notes</label>
+                                 <input type="text" class="form-control" name="notes[]" value="{{ item.notes or '' }}">
+                             </div>
+                             <div class="col-md-1">
+                                 <label class="form-label">Remove</label>
+                                 <button type="button" class="btn btn-danger btn-sm w-100 remove-item-btn" title="Remove this item">
+                                     <i class="fas fa-trash"></i>
+                                 </button>
+                             </div>
+                         </div>
+                     </div>
+                     {% endfor %}
+                 </div>
                 
                 <div class="text-center" id="noItemsMessage" {% if quotation.items %}style="display: none;"{% endif %}>
                     <p class="text-muted">No items added yet. Use the form above to add products.</p>
@@ -332,6 +397,115 @@ function addProduct() {
     document.getElementById('noItemsMessage').style.display = 'none';
 }
 
+function addManualItem() {
+    const itemName = document.getElementById('manual_item_name').value.trim();
+    const quantity = parseInt(document.getElementById('manual_quantity').value);
+    const unitPrice = parseFloat(document.getElementById('manual_unit_price').value);
+    const notes = document.getElementById('manual_item_notes').value.trim();
+
+    if (!itemName) {
+        alert('Item name cannot be empty.');
+        document.getElementById('manual_item_name').focus();
+        return;
+    }
+
+    if (!quantity || quantity < 1) {
+        alert('Quantity must be at least 1.');
+        document.getElementById('manual_quantity').focus();
+        return;
+    }
+
+    if (!unitPrice || unitPrice < 0) {
+        alert('Unit price must be a positive number.');
+        document.getElementById('manual_unit_price').focus();
+        return;
+    }
+
+    // Check if item already exists in quotation (case-insensitive)
+    const existingItems = document.querySelectorAll('.quotation-item');
+    let existingItem = null;
+    existingItems.forEach(item => {
+        const productSelect = item.querySelector('select[name="item_id[]"]');
+        if (productSelect.value === '') {
+            const itemNameInput = item.querySelector('input[name="item_name[]"]');
+            if (itemNameInput && itemNameInput.value.toLowerCase() === itemName.toLowerCase()) {
+                existingItem = item;
+            }
+        }
+    });
+    
+    if (existingItem) {
+        const confirmAdd = confirm(`Item "${itemName}" already exists in the quotation. Do you want to add ${quantity} more units?`);
+        if (confirmAdd) {
+            const quantityInput = existingItem.querySelector('input[name="quantity[]"]');
+            const currentQty = parseInt(quantityInput.value);
+            quantityInput.value = currentQty + quantity;
+            calculateTotal(quantityInput);
+            clearManualItemForm();
+        }
+        return;
+    }
+
+    const total = (quantity * unitPrice).toFixed(2);
+    
+    const itemHtml = `
+        <div class="quotation-item border rounded p-3 mb-3" data-item-id="new">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">Product</label>
+                    <input type="text" class="form-control" name="item_name[]" value="${itemName}" readonly>
+                    <input type="hidden" name="item_id[]" value="">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" class="form-control" name="quantity[]" value="${quantity}" min="1" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Unit Price</label>
+                    <input type="number" class="form-control" name="unit_price[]" value="${unitPrice}" step="0.01" min="0" required>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Total</label>
+                    <input type="text" class="form-control" value="KSh${total}" readonly>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Notes</label>
+                    <input type="text" class="form-control" name="notes[]" value="${notes}">
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">Remove</label>
+                    <button type="button" class="btn btn-danger btn-sm w-100 remove-item-btn" title="Remove this item">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('quotationItems').insertAdjacentHTML('beforeend', itemHtml);
+    
+    // Add event listeners to new inputs
+    const newItem = document.getElementById('quotationItems').lastElementChild;
+    const quantityInput = newItem.querySelector('input[name="quantity[]"]');
+    const unitPriceInput = newItem.querySelector('input[name="unit_price[]"]');
+    
+    quantityInput.addEventListener('input', () => calculateTotal(quantityInput));
+    unitPriceInput.addEventListener('input', () => calculateTotal(unitPriceInput));
+    
+    // Clear manual item form
+    clearManualItemForm();
+    
+    // Hide no items message
+    document.getElementById('noItemsMessage').style.display = 'none';
+}
+
+function clearManualItemForm() {
+    document.getElementById('manual_item_name').value = '';
+    document.getElementById('manual_quantity').value = '1';
+    document.getElementById('manual_unit_price').value = '';
+    document.getElementById('manual_item_notes').value = '';
+}
+
 function removeItem(button) {
     const item = button.closest('.quotation-item');
     item.remove();
@@ -355,11 +529,16 @@ document.getElementById('editQuotationForm').addEventListener('submit', function
     // Validate each item
     let isValid = true;
     items.forEach(item => {
-        const product = item.querySelector('select[name="item_id[]"]').value;
+        const productSelect = item.querySelector('select[name="item_id[]"]');
+        const itemNameInput = item.querySelector('input[name="item_name[]"]');
         const quantity = item.querySelector('input[name="quantity[]"]').value;
         const unitPrice = item.querySelector('input[name="unit_price[]"]').value;
         
-        if (!product || !quantity || !unitPrice) {
+        // Check if it's a regular product (has product_id) or manual item (has item_name)
+        const hasProduct = productSelect && productSelect.value;
+        const hasItemName = itemNameInput && itemNameInput.value;
+        
+        if ((!hasProduct && !hasItemName) || !quantity || !unitPrice) {
             isValid = false;
         }
     });
