@@ -175,11 +175,12 @@
                                          </option>
                                          {% endfor %}
                                      </select>
+                                     <input type="hidden" name="item_name[]" value="">
                                  {% else %}
-                                     <!-- Manual item - show readonly text input -->
-                                     <input type="text" class="form-control" name="item_name[]" value="{{ item.product_name or 'Manual Item' }}" readonly>
-                                     <input type="hidden" name="item_id[]" value="">
-                                 {% endif %}
+                                      <!-- Manual item - show editable text input -->
+                                      <input type="text" class="form-control" name="item_name[]" value="{{ item.product_name or 'Manual Item' }}" required>
+                                      <input type="hidden" name="item_id[]" value="">
+                                  {% endif %}
                              </div>
                              <div class="col-md-2">
                                  <label class="form-label">Quantity</label>
@@ -224,10 +225,10 @@
                         <p><strong>Created:</strong> {{ quotation.created_at.strftime('%B %d, %Y') }}</p>
                         <p><strong>Status:</strong> <span class="badge bg-{{ 'warning' if quotation.status == 'pending' else 'success' if quotation.status == 'accepted' else 'danger' if quotation.status == 'rejected' else 'secondary' }}">{{ quotation.status.title() }}</span></p>
                     </div>
-                    <div class="col-md-6 text-end">
-                        <h6>Total Amount</h6>
-                        <h3 class="text-primary">KSh{{ "%.2f"|format(quotation.total_amount) }}</h3>
-                    </div>
+                                         <div class="col-md-6 text-end">
+                         <h6>Total Amount</h6>
+                         <h3 class="text-primary" id="grandTotal">KSh{{ "%.2f"|format(quotation.total_amount) }}</h3>
+                     </div>
                 </div>
                 
                 <div class="d-flex justify-content-between mt-3">
@@ -296,11 +297,38 @@ function calculateTotal(input) {
     const item = input.closest('.quotation-item');
     const quantity = item.querySelector('input[name="quantity[]"]').value;
     const unitPrice = item.querySelector('input[name="unit_price[]"]').value;
-    const totalInput = item.querySelector('input[readonly]');
     
-    if (quantity && unitPrice) {
+    // Find the total input specifically by looking for the one with "Total" label
+    const totalInput = item.querySelector('input[value*="KSh"]');
+    
+    if (quantity && unitPrice && totalInput) {
         const total = (parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2);
         totalInput.value = `KSh${total}`;
+    }
+    
+    // Update the grand total
+    updateGrandTotal();
+}
+
+// Calculate and update the grand total
+function updateGrandTotal() {
+    const items = document.querySelectorAll('.quotation-item');
+    let grandTotal = 0;
+    
+    items.forEach(item => {
+        const totalInput = item.querySelector('input[value*="KSh"]');
+        if (totalInput && totalInput.value) {
+            const totalValue = parseFloat(totalInput.value.replace('KSh', ''));
+            if (!isNaN(totalValue)) {
+                grandTotal += totalValue;
+            }
+        }
+    });
+    
+    // Update the grand total display
+    const grandTotalElement = document.getElementById('grandTotal');
+    if (grandTotalElement) {
+        grandTotalElement.textContent = `KSh${grandTotal.toFixed(2)}`;
     }
 }
 
@@ -321,6 +349,9 @@ document.addEventListener('DOMContentLoaded', function() {
             removeItem(e.target.closest('.remove-item-btn'));
         }
     });
+    
+    // Calculate initial grand total
+    updateGrandTotal();
 });
 
 function addProduct() {
@@ -395,6 +426,9 @@ function addProduct() {
     
     // Hide no items message
     document.getElementById('noItemsMessage').style.display = 'none';
+    
+    // Update grand total after adding item
+    updateGrandTotal();
 }
 
 function addManualItem() {
@@ -426,9 +460,11 @@ function addManualItem() {
     let existingItem = null;
     existingItems.forEach(item => {
         const productSelect = item.querySelector('select[name="item_id[]"]');
-        if (productSelect.value === '') {
-            const itemNameInput = item.querySelector('input[name="item_name[]"]');
-            if (itemNameInput && itemNameInput.value.toLowerCase() === itemName.toLowerCase()) {
+        const itemNameInput = item.querySelector('input[name="item_name[]"]');
+        
+        // Check if it's a manual item (has item_name input but no product_id)
+        if (itemNameInput && itemNameInput.value && (!productSelect || productSelect.value === '')) {
+            if (itemNameInput.value.toLowerCase() === itemName.toLowerCase()) {
                 existingItem = item;
             }
         }
@@ -438,9 +474,11 @@ function addManualItem() {
         const confirmAdd = confirm(`Item "${itemName}" already exists in the quotation. Do you want to add ${quantity} more units?`);
         if (confirmAdd) {
             const quantityInput = existingItem.querySelector('input[name="quantity[]"]');
-            const currentQty = parseInt(quantityInput.value);
-            quantityInput.value = currentQty + quantity;
-            calculateTotal(quantityInput);
+            if (quantityInput) {
+                const currentQty = parseInt(quantityInput.value) || 0;
+                quantityInput.value = currentQty + quantity;
+                calculateTotal(quantityInput);
+            }
             clearManualItemForm();
         }
         return;
@@ -497,6 +535,9 @@ function addManualItem() {
     
     // Hide no items message
     document.getElementById('noItemsMessage').style.display = 'none';
+    
+    // Update grand total after adding item
+    updateGrandTotal();
 }
 
 function clearManualItemForm() {
@@ -515,6 +556,9 @@ function removeItem(button) {
     if (items.length === 0) {
         document.getElementById('noItemsMessage').style.display = 'block';
     }
+    
+    // Update grand total after removing item
+    updateGrandTotal();
 }
 
 // Form validation

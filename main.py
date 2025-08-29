@@ -1275,9 +1275,33 @@ def edit_quotation(quotation_id):
             
             # Update items
             item_ids = request.form.getlist('item_id[]')
+            item_names = request.form.getlist('item_name[]')
             quantities = request.form.getlist('quantity[]')
             unit_prices = request.form.getlist('unit_price[]')
             notes = request.form.getlist('notes[]')
+            
+            # Debug logging
+            print(f"DEBUG: item_ids: {item_ids}")
+            print(f"DEBUG: item_names: {item_names}")
+            print(f"DEBUG: quantities: {quantities}")
+            print(f"DEBUG: unit_prices: {unit_prices}")
+            print(f"DEBUG: notes: {notes}")
+            
+            # Check if arrays are properly aligned
+            if len(item_ids) != len(quantities) or len(item_names) != len(quantities):
+                print(f"WARNING: Array length mismatch detected!")
+                print(f"All arrays should have the same length as quantities: {len(quantities)}")
+                print(f"item_ids length: {len(item_ids)}")
+                print(f"item_names length: {len(item_names)}")
+                print(f"notes length: {len(notes)}")
+            
+            # Also check the raw form data to see what's actually being sent
+            print(f"DEBUG: Raw form data keys: {list(request.form.keys())}")
+            print(f"DEBUG: All item_id[] values: {request.form.getlist('item_id[]')}")
+            print(f"DEBUG: All item_name[] values: {request.form.getlist('item_name[]')}")
+            print(f"DEBUG: All quantity[] values: {request.form.getlist('quantity[]')}")
+            print(f"DEBUG: All unit_price[] values: {request.form.getlist('unit_price[]')}")
+            print(f"DEBUG: All notes[] values: {request.form.getlist('notes[]')}")
             
             # Clear existing items
             for item in quotation.items:
@@ -1285,21 +1309,67 @@ def edit_quotation(quotation_id):
             
             # Add updated items
             subtotal = 0
-            for i in range(len(item_ids)):
-                if item_ids[i] and quantities[i] and unit_prices[i]:
+            
+            # Create a more robust approach by processing each item individually
+            # and finding the corresponding data from the form arrays
+            for i in range(len(quantities)):
+                if quantities[i] and unit_prices[i]:
                     quantity = int(quantities[i])
                     unit_price = float(unit_prices[i])
                     total_price = quantity * unit_price
                     subtotal += total_price
                     
-                    item = QuotationItem(
-                        quotation_id=quotation.id,
-                        product_id=int(item_ids[i]),
-                        quantity=quantity,
-                        unit_price=unit_price,
-                        total_price=total_price,
-                        notes=notes[i] if notes[i] else None
-                    )
+                    # Safely get values with bounds checking
+                    item_id = item_ids[i] if i < len(item_ids) else ''
+                    item_name = item_names[i] if i < len(item_names) else ''
+                    note = notes[i] if i < len(notes) else ''
+                    
+                    # Debug logging for each item
+                    print(f"DEBUG Item {i}: item_id='{item_id}', item_name='{item_name}', quantity='{quantity}', unit_price='{unit_price}'")
+                    
+                    # Check if it's a regular product or manual item
+                    if item_id and item_id.strip() and item_id != '':  # Regular product
+                        print(f"DEBUG: Creating REGULAR PRODUCT with product_id={item_id}")
+                        item = QuotationItem(
+                            quotation_id=quotation.id,
+                            product_id=int(item_id),
+                            product_name=None,  # Will get name from product relationship
+                            quantity=quantity,
+                            unit_price=unit_price,
+                            total_price=total_price,
+                            notes=note if note else None
+                        )
+                    else:  # Manual item
+                        print(f"DEBUG: Processing MANUAL ITEM at index {i}")
+                        print(f"DEBUG: item_name from form: '{item_name}'")
+                        print(f"DEBUG: item_name type: {type(item_name)}")
+                        print(f"DEBUG: item_name length: {len(item_name) if item_name else 'None'}")
+                        
+                        # Use the item_name if available, otherwise fallback to 'Manual Item'
+                        manual_item_name = item_name if item_name and item_name.strip() else 'Manual Item'
+                        print(f"DEBUG: Creating MANUAL ITEM with product_name='{manual_item_name}' (original item_name='{item_name}')")
+                        
+                        # Additional check: if item_name is empty or just whitespace, try to find it from the form
+                        if not manual_item_name or manual_item_name.strip() == '':
+                            print(f"WARNING: item_name is empty for manual item at index {i}")
+                            print(f"Available item_names: {item_names}")
+                            # Try to find a non-empty item_name in the array
+                            for j, name in enumerate(item_names):
+                                if name and name.strip() and name.strip() != '':
+                                    print(f"Found non-empty item_name at index {j}: '{name}'")
+                                    manual_item_name = name.strip()
+                                    break
+                        
+                        item = QuotationItem(
+                            quotation_id=quotation.id,
+                            product_id=None,  # No product ID for manual items
+                            product_name=manual_item_name,
+                            quantity=quantity,
+                            unit_price=unit_price,
+                            total_price=total_price,
+                            notes=note if note else None
+                        )
+                    
                     db.session.add(item)
             
             quotation.subtotal = subtotal
