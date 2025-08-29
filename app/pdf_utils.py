@@ -807,3 +807,205 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
     doc.build(elements)
     
     return output_path 
+
+def create_invoice_pdf_a4(invoice_data, user_data, output_path):
+    """
+    Create a professional invoice PDF (A4 size) that looks exactly like the quotation
+    """
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from datetime import datetime
+    import pytz
+    
+    # Set timezone to East Africa Time
+    EAT = pytz.timezone('Africa/Nairobi')
+    
+    # Create PDF buffer
+    if isinstance(output_path, str):
+        doc = SimpleDocTemplate(output_path, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=18)
+    else:
+        doc = SimpleDocTemplate(output_path, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=18)
+    
+    # Container for the 'Flowable' objects
+    elements = []
+    
+    # Define styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30,
+        alignment=1,  # Center alignment
+        textColor=colors.HexColor('#2c3e50')
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=16,
+        spaceAfter=20,
+        textColor=colors.HexColor('#34495e')
+    )
+    
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=11,
+        spaceAfter=12
+    )
+    
+    # Try to load the logo
+    try:
+        logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'logo.png')
+        if os.path.exists(logo_path):
+            logo_image = Image(logo_path, width=1.5*inch, height=1*inch)
+            logo_cell = logo_image
+        else:
+            logo_cell = Paragraph('''
+            <para align=left>
+            <b><font size=24 color="#1a365d">🔧ABZ</font></b><br/>
+            <b><font size=16 color="#f4b942">HARDWARE</font></b><br/>
+            <b><font size=14 color="#1a365d">LIMITED</font></b>
+            </para>
+            ''', normal_style)
+    except:
+        logo_cell = Paragraph('''
+        <para align=left>
+        <b><font size=24 color="#1a365d">🔧ABZ</font></b><br/>
+        <b><font size=16 color="#f4b942">HARDWARE</font></b><br/>
+        <b><font size=14 color="#1a365d">LIMITED</font></b>
+        </para>
+        ''', normal_style)
+    
+    # Create letterhead table
+    letterhead_data = [[
+        logo_cell,
+        Paragraph('''
+        <para align=right>
+        <b><font size=11 color="#1a365d">Kombo Munyiri Road,</font></b><br/>
+        <b><font size=11 color="#1a365d">Gikomba, Nairobi, Kenya</font></b><br/>
+        <font size=9 color="#666666">0711 732 341 or 0725 000 055</font><br/>
+        <font size=9 color="#666666">info@abzhardware.co.ke</font><br/>
+        <font size=9 color="#666666">www.abzhardware.co.ke</font>
+        </para>
+        ''', normal_style)
+    ]]
+    
+    letterhead_table = Table(letterhead_data, colWidths=[3.5*inch, 3.5*inch])
+    letterhead_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (0, 0), 0),
+        ('RIGHTPADDING', (1, 0), (1, 0), 0),
+    ]))
+    
+    elements.append(letterhead_table)
+    elements.append(Spacer(1, 10))
+    
+    # Add colored line separator
+    separator_data = [[""]]
+    separator_table = Table(separator_data, colWidths=[7*inch], rowHeights=[0.05*inch])
+    separator_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#f4b942')),
+    ]))
+    
+    elements.append(separator_table)
+    elements.append(Spacer(1, 30))
+    
+    # Invoice Title
+    elements.append(Paragraph("INVOICE", title_style))
+    elements.append(Spacer(1, 30))
+    
+    # Invoice Details
+    invoice_details = f"""
+    <b>Invoice Number:</b> {invoice_data.get('invoice_number', 'N/A')}<br/>
+    <b>Order Number:</b> {invoice_data.get('order_id', 'N/A')}<br/>
+    <b>Date & Time:</b> {invoice_data.get('order_date', 'N/A')} at {invoice_data.get('order_time', 'N/A')}<br/>
+    <b>Branch:</b> {invoice_data.get('branch', 'N/A')}<br/>
+    """
+    elements.append(Paragraph(invoice_details, normal_style))
+    elements.append(Spacer(1, 30))
+    
+    # Items Table
+    if invoice_data.get('order_items'):
+        elements.append(Paragraph("ITEMS INVOICED", heading_style))
+        
+        data = [['Product Name', 'Quantity', 'Unit Price', 'Total Price']]
+        
+        for item in invoice_data['order_items']:
+            product_name = item.get('product_name', 'N/A')
+            quantity = item.get('quantity', 0)
+            unit_price = item.get('unit_price', 0)
+            total_price = item.get('total', 0)
+            
+            data.append([
+                (product_name or 'N/A').upper(),
+                str(quantity) if quantity else '0',
+                f"KSh {unit_price:,.2f}" if unit_price else 'N/A',
+                f"KSh {total_price:,.2f}" if total_price else 'N/A'
+            ])
+        
+        table = Table(data, colWidths=[3.5*inch, 1*inch, 1.5*inch, 1.5*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a365d')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 11),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#4a5568')),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f7fafc'), colors.white]),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (1, -1), 'CENTER'),
+            ('ALIGN', (2, 1), (3, -1), 'RIGHT'),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        
+        elements.append(table)
+        elements.append(Spacer(1, 30))
+    
+    # Total Amount
+    if invoice_data.get('subtotal'):
+        total_data = [['Total Amount:', f"KSh {invoice_data['subtotal']:,.2f}"]]
+        total_table = Table(total_data, colWidths=[2*inch, 2*inch])
+        total_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#4a5568')),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#e2e8f0')),
+        ]))
+        
+        elements.append(total_table)
+        elements.append(Spacer(1, 30))
+    
+    # Payment Methods Section
+    elements.append(Paragraph("PAYMENT METHODS", heading_style))
+    payment_methods = """
+    <b>Send Money:</b> 0710460525
+    """
+    elements.append(Paragraph(payment_methods, normal_style))
+    elements.append(Spacer(1, 30))
+    
+    # Footer
+    footer_text = f"""
+    <para align=center>
+    <font size=8 color="#95a5a6">
+    Generated on {datetime.now(EAT).strftime('%B %d, %Y at %I:%M %p')} by {user_data.get('firstname', 'N/A')} {user_data.get('lastname', 'N/A')}<br/>
+    This is a computer-generated document and does not require a signature.
+    </font>
+    </para>
+    """
+    elements.append(Spacer(1, 50))
+    elements.append(Paragraph(footer_text, normal_style))
+    
+    # Build PDF
+    doc.build(elements)
+    return output_path

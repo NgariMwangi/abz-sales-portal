@@ -283,6 +283,7 @@ def order_detail(order_id):
 def view_order_invoice(order_id):
     """Generate PDF invoice for a specific order"""
     from app.pdf_utils import create_receipt_pdf, generate_receipt_filename
+    from datetime import datetime
     import tempfile
     import os
     
@@ -347,14 +348,16 @@ def view_order_invoice(order_id):
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
             pdf_path = tmp_file.name
         
-        # Generate PDF
-        create_receipt_pdf(invoice_data, user_data, pdf_path)
+        # Generate PDF using dedicated invoice function
+        from app.pdf_utils import create_invoice_pdf_a4
+        
+        create_invoice_pdf_a4(invoice_data, user_data, pdf_path)
         
         # Return PDF file
         return send_file(
             pdf_path,
             as_attachment=True,
-            download_name=f"receipt_INV-{order.id:06d}.pdf",
+            download_name=f"invoice_INV-{order.id:06d}.pdf",
             mimetype='application/pdf'
         )
         
@@ -404,7 +407,9 @@ def view_order_invoice_browser(order_id):
         # Use final_price for calculations (includes negotiated prices)
         if item.final_price is not None:
             final_price = float(item.final_price)
-        elif item.product.sellingprice is not None:
+        elif item.original_price is not None:
+            final_price = float(item.original_price)
+        elif item.product and item.product.sellingprice is not None:
             final_price = float(item.product.sellingprice)
         else:
             final_price = 0.0
@@ -413,7 +418,7 @@ def view_order_invoice_browser(order_id):
         invoice_data['subtotal'] += item_total
         
         invoice_data['order_items'].append({
-            'product_name': item.product.name,
+            'product_name': item.product_name if item.product_name else (item.product.name if item.product else 'Manual Item'),
             'quantity': item.quantity,
             'unit_price': final_price,
             'total': item_total
@@ -431,8 +436,10 @@ def view_order_invoice_browser(order_id):
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
             pdf_path = tmp_file.name
         
-        # Generate PDF
-        create_receipt_pdf(invoice_data, user_data, pdf_path)
+        # Generate PDF using dedicated invoice function
+        from app.pdf_utils import create_invoice_pdf_a4
+        
+        create_invoice_pdf_a4(invoice_data, user_data, pdf_path)
         
         # Return PDF file for browser viewing
         return send_file(
@@ -614,6 +621,7 @@ def edit_order(order_id):
             'product_name': product_name,
             'quantity': item.quantity,
             'price': product_price,
+            'buying_price': float(item.buying_price) if item.buying_price else None,
             'negotiated_price': float(item.negotiated_price) if item.negotiated_price else None,
             'negotiation_notes': item.negotiation_notes
         })
@@ -979,6 +987,7 @@ def api_products():
                 'id': p.id,
                 'name': p.name or '',
                 'selling_price': float(p.sellingprice) if p.sellingprice else 0.0,
+                'buyingprice': float(p.buyingprice) if p.buyingprice else 0.0,
                 'stock': int(p.stock) if p.stock else 0,
                 'product_code': p.productcode or ''
             })

@@ -729,6 +729,8 @@ function removeProduct(index) {
     updateTotal();
 }
 
+
+
 function updateOrderItemsDisplay() {
     const container = document.getElementById('orderItems');
     const summaryDiv = document.getElementById('orderSummary');
@@ -808,7 +810,12 @@ function updateOrderItemsDisplay() {
                     ${isBackorder ? '<span class="badge bg-danger ms-2">Backorder</span>' : ''}
                 </td>
                 <td>
-                    ${item.quantity}
+                    <input type="number" 
+                           class="form-control form-control-sm quantity-input" 
+                           value="${item.quantity}" 
+                           min="1"
+                           data-index="${index}"
+                           onchange="updateQuantity(${index}, this.value)">
                     ${isBackorder ? `<br><small class="text-danger">(${availableStock} in stock)</small>` : ''}
                 </td>
                 <td>KSh${buyingPrice.toFixed(2)}</td>
@@ -855,6 +862,37 @@ function updateNegotiatedPrice(index, newPrice) {
 
 function updateNegotiationNotes(index, notes) {
     orderItems[index].negotiation_notes = notes.trim() || null;
+}
+
+function updateQuantity(index, newQuantity) {
+    const quantity = parseInt(newQuantity);
+    if (quantity < 1) {
+        alert('Quantity must be at least 1.');
+        return;
+    }
+
+    const item = orderItems[index];
+    
+    // For regular products, check stock availability
+    if (item.product_id) {
+        const product = products.find(p => p.id === item.product_id);
+        if (product && quantity > product.stock) {
+            // Allow the quantity but show a warning about insufficient stock
+            const confirmLowStock = confirm(
+                `Warning: You're setting quantity to ${quantity} units of ${item.product_name}, but only ${product.stock} are available in stock.\n\n` +
+                `This will create a backorder. Do you want to continue?`
+            );
+            
+            if (!confirmLowStock) {
+                return;
+            }
+        }
+    }
+    // For manual items, no stock restrictions
+
+    item.quantity = quantity;
+    updateOrderItemsDisplay();
+    updateTotal();
 }
 
 function updateTotal() {
@@ -933,9 +971,8 @@ document.getElementById('createOrderForm').addEventListener('submit', function(e
 
 // Update products when branch changes
 document.getElementById('branch_id').addEventListener('change', function() {
-    // Clear current products and order items when branch changes
+    // Clear current products but preserve order items when branch changes
     products = [];
-    orderItems = [];
     
     // Clear search query and reset search UI
     searchQuery = '';
@@ -951,19 +988,40 @@ document.getElementById('branch_id').addEventListener('change', function() {
     // Clear product selection
     document.getElementById('product_select').innerHTML = '<option value="">Select Product</option>';
     
-    // Clear order items display
-    document.getElementById('orderItems').innerHTML = '<p class="text-muted">No items added yet. Add products to create your walk-in order.</p>';
-    
-    // Reset total and product count
-    document.getElementById('totalAmount').textContent = '0.00';
-    document.getElementById('orderItemsData').value = '[]';
-    document.getElementById('createOrderBtn').disabled = true;
+    // Update product count message
     document.getElementById('product_count').textContent = 'Please select a branch above to view available products';
-    document.getElementById('totalProfit').textContent = 'KSh0.00'; // Reset profit
-    document.getElementById('totalProfit').classList.remove('profit-positive', 'profit-negative');
     
     // Load products for the new branch
     loadProducts();
+    
+    // Refresh the order items display to ensure everything is shown correctly
+    if (orderItems.length > 0) {
+        updateOrderItemsDisplay();
+        updateTotal();
+        
+        // Show a message that order items are preserved
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'alert alert-info alert-dismissible fade show mt-2';
+        messageDiv.innerHTML = `
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Branch changed!</strong> Your ${orderItems.length} order item(s) have been preserved. 
+            You can now add products from the new branch.
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // Insert the message after the branch selection
+        const branchCard = document.querySelector('.card:has(#branch_id)');
+        if (branchCard) {
+            branchCard.parentNode.insertBefore(messageDiv, branchCard.nextSibling);
+        }
+        
+        // Auto-remove message after 5 seconds
+        setTimeout(() => {
+            if (messageDiv.parentNode) {
+                messageDiv.remove();
+            }
+        }, 5000);
+    }
 });
 </script>
 {% endblock %} 
