@@ -190,79 +190,79 @@ class OrderService:
                     product_name = product.name
                     
                     # For walk-in orders, use selling price as original price (what customer pays)
-                    # For online orders, use selling price as original price
-                    if is_walk_in:
-                        if product.sellingprice is not None and product.sellingprice > 0:
-                            original_price = float(product.sellingprice)
-                        elif product.buyingprice is not None and product.buyingprice > 0:
-                            original_price = float(product.buyingprice)
-                        else:
-                            raise ValueError(f'Product {product.name} has no valid price (selling or buying price is missing or zero)')
+                # For online orders, use selling price as original price
+                if is_walk_in:
+                    if product.sellingprice is not None and product.sellingprice > 0:
+                        original_price = float(product.sellingprice)
+                    elif product.buyingprice is not None and product.buyingprice > 0:
+                        original_price = float(product.buyingprice)
                     else:
-                        if product.sellingprice is not None and product.sellingprice > 0:
-                            original_price = float(product.sellingprice)
-                        else:
-                            raise ValueError(f'Product {product.name} has no valid selling price')
-                    
-                    # Handle negotiated price if provided
-                    negotiated_price_raw = item_data.get('negotiated_price')
-                    if negotiated_price_raw is not None:
-                        negotiated_price = float(negotiated_price_raw)
-                    else:
-                        negotiated_price = original_price
-                    final_price = negotiated_price if negotiated_price != original_price else original_price
-                    negotiation_notes = item_data.get('negotiation_notes', None)
-                    
-                    order_item = OrderItem(
-                        orderid=order.id,
-                        productid=product.id,
-                        product_name=product.name,  # Use product name from database
-                        quantity=quantity,
-                        buying_price=float(product.buyingprice) if product.buyingprice is not None and product.buyingprice > 0 else None,
-                        original_price=original_price,
-                        negotiated_price=negotiated_price if negotiated_price != original_price else None,
-                        final_price=final_price,
-                        negotiation_notes=negotiation_notes or ''
-                    )
+                        raise ValueError(f'Product {product.name} has no valid price (selling or buying price is missing or zero)')
                 else:
-                    # Manual item - use provided data
-                    product_name = item_data.get('product_name', 'Manual Item')
-                    if not product_name:
-                        raise ValueError('Product name is required for manual items')
-                    
-                    # Get price from item data
-                    price = float(item_data.get('price', 0))
-                    if price <= 0:
-                        raise ValueError(f'Valid price is required for manual item: {product_name}')
-                    
-                    # Get buying price if provided
-                    buying_price = item_data.get('buying_price')
-                    if buying_price is not None and buying_price != '':
-                        buying_price = float(buying_price)
+                    if product.sellingprice is not None and product.sellingprice > 0:
+                        original_price = float(product.sellingprice)
                     else:
-                        buying_price = None
-                    
-                    # Handle negotiated price if provided
-                    negotiated_price_raw = item_data.get('negotiated_price')
-                    if negotiated_price_raw is not None and negotiated_price_raw != '':
-                        negotiated_price = float(negotiated_price_raw)
-                    else:
-                        negotiated_price = price
-                    
-                    final_price = negotiated_price
-                    negotiation_notes = item_data.get('negotiation_notes', None)
-                    
-                    order_item = OrderItem(
-                        orderid=order.id,
-                        productid=None,  # Manual items have no product ID
-                        product_name=product_name,  # Use product name from item data
-                        quantity=quantity,
-                        buying_price=buying_price,
-                        original_price=price,
-                        negotiated_price=negotiated_price if negotiated_price != price else None,
-                        final_price=final_price,
-                        negotiation_notes=negotiation_notes or ''
-                    )
+                        raise ValueError(f'Product {product.name} has no valid selling price')
+                
+                # Handle negotiated price if provided
+                negotiated_price_raw = item_data.get('negotiated_price')
+                if negotiated_price_raw is not None:
+                    negotiated_price = float(negotiated_price_raw)
+                else:
+                    negotiated_price = original_price
+                final_price = negotiated_price if negotiated_price != original_price else original_price
+                negotiation_notes = item_data.get('negotiation_notes', None)
+                
+                order_item = OrderItem(
+                    orderid=order.id,
+                    productid=product.id,
+                    product_name=product.name,  # Use product name from database
+                    quantity=quantity,
+                    buying_price=float(product.buyingprice) if product.buyingprice is not None and product.buyingprice > 0 else None,
+                    original_price=original_price,
+                    negotiated_price=negotiated_price if negotiated_price != original_price else None,
+                    final_price=final_price,
+                    negotiation_notes=negotiation_notes or ''
+                )
+            else:
+                # Manual item - use provided data
+                product_name = item_data.get('product_name', 'Manual Item')
+                if not product_name:
+                    raise ValueError('Product name is required for manual items')
+                
+                # Get price from item data
+                price = float(item_data.get('price', 0))
+                if price <= 0:
+                    raise ValueError(f'Valid price is required for manual item: {product_name}')
+                
+                # Get buying price if provided
+                buying_price = item_data.get('buying_price')
+                if buying_price is not None and buying_price != '':
+                    buying_price = float(buying_price)
+                else:
+                    buying_price = None
+                
+                # Handle negotiated price if provided
+                negotiated_price_raw = item_data.get('negotiated_price')
+                if negotiated_price_raw is not None and negotiated_price_raw != '':
+                    negotiated_price = float(negotiated_price_raw)
+                else:
+                    negotiated_price = price
+                
+                final_price = negotiated_price
+                negotiation_notes = item_data.get('negotiation_notes', None)
+                
+                order_item = OrderItem(
+                    orderid=order.id,
+                    productid=None,  # Manual items have no product ID
+                    product_name=product_name,  # Use product name from item data
+                    quantity=quantity,
+                    buying_price=buying_price,
+                    original_price=price,
+                    negotiated_price=negotiated_price if negotiated_price != price else None,
+                    final_price=final_price,
+                    negotiation_notes=negotiation_notes or ''
+                )
                 
                 db.session.add(order_item)
                 total_amount += final_price * quantity
@@ -786,27 +786,52 @@ class QuotationService:
             items_data = data.get('items', [])
             
             for item_data in items_data:
-                if not item_data.get('product_id') or not item_data.get('quantity'):
-                    raise ValueError('Product ID and quantity are required for each item')
+                if not item_data.get('quantity'):
+                    raise ValueError('Quantity is required for each item')
                 
-                product = Product.query.get_or_404(int(item_data['product_id']))
                 quantity = int(item_data['quantity'])
-                unit_price = float(item_data.get('unit_price', product.sellingprice or 0))
-                
                 if quantity <= 0:
-                    raise ValueError(f'Invalid quantity for product {product.name}')
+                    raise ValueError(f'Invalid quantity for item')
+                
+                # Check if this is a manual item (no product_id) or regular product
+                if item_data.get('product_id'):
+                    # Regular product - get product details from database
+                    product = Product.query.get_or_404(int(item_data['product_id']))
+                    unit_price = float(item_data.get('unit_price', product.sellingprice or 0))
+                    
+                    if unit_price <= 0:
+                        raise ValueError(f'Valid unit price is required for product {product.name}')
+                    
+                    quotation_item = QuotationItem(
+                        quotation_id=quotation.id,
+                        product_id=product.id,
+                        quantity=quantity,
+                        unit_price=unit_price,
+                        total_price=quantity * unit_price,
+                        notes=item_data.get('notes', '')
+                    )
+                else:
+                    # Manual item - use provided data
+                    product_name = item_data.get('product_name', 'Manual Item')
+                    if not product_name:
+                        raise ValueError('Product name is required for manual items')
+                    
+                    unit_price = float(item_data.get('unit_price', 0))
+                    if unit_price <= 0:
+                        raise ValueError(f'Valid unit price is required for manual item: {product_name}')
+                    
+                    quotation_item = QuotationItem(
+                        quotation_id=quotation.id,
+                        product_id=None,  # Manual items have no product ID
+                        product_name=product_name,  # Store the manual item name
+                        quantity=quantity,
+                        unit_price=unit_price,
+                        total_price=quantity * unit_price,
+                        notes=item_data.get('notes', '')
+                    )
                 
                 item_total = quantity * unit_price
                 total_amount += item_total
-                
-                quotation_item = QuotationItem(
-                    quotation_id=quotation.id,
-                    product_id=product.id,
-                    quantity=quantity,
-                    unit_price=unit_price,
-                    total_price=item_total,
-                    notes=item_data.get('notes', '')
-                )
                 db.session.add(quotation_item)
             
             # Update quotation totals

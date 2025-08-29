@@ -1145,7 +1145,7 @@ def view_quotation_pdf(quotation_id):
         return redirect(url_for('quotations_page'))
     
     # Generate PDF for quotation
-    from app.pdf_utils import create_quotation_pdf
+    from app.pdf_utils import create_quotation_pdf_a4
     import tempfile
     import os
     
@@ -1155,7 +1155,7 @@ def view_quotation_pdf(quotation_id):
             pdf_path = tmp_file.name
         
         # Generate PDF
-        create_quotation_pdf(quotation, current_user, pdf_path)
+        create_quotation_pdf_a4(quotation, current_user, pdf_path)
         
         # Return PDF file for browser viewing
         return send_file(
@@ -1188,7 +1188,7 @@ def download_quotation_pdf(quotation_id):
         return redirect(url_for('quotations_page'))
     
     # Generate PDF for quotation
-    from app.pdf_utils import create_quotation_pdf
+    from app.pdf_utils import create_quotation_pdf_a4
     import tempfile
     import os
     
@@ -1198,7 +1198,7 @@ def download_quotation_pdf(quotation_id):
             pdf_path = tmp_file.name
         
         # Generate PDF
-        create_quotation_pdf(quotation, current_user, pdf_path)
+        create_quotation_pdf_a4(quotation, current_user, pdf_path)
         
         # Return PDF file for download
         return send_file(

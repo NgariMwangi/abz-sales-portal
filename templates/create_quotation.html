@@ -2,6 +2,49 @@
 
 {% block title %}Create Quotation{% endblock %}
 
+{% block head %}
+<style>
+    /* Manual item styling */
+    .manual-item-section {
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+    }
+    
+    .table-warning {
+        background-color: #fff3cd !important;
+    }
+    
+    .table-warning:hover {
+        background-color: #ffeaa7 !important;
+    }
+    
+    .badge.bg-warning {
+        font-size: 0.75em;
+        padding: 0.25em 0.5em;
+    }
+    
+    /* Form styling */
+    .form-control:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #007bff;
+        border-color: #007bff;
+        color: white;
+    }
+    
+    .alert-success {
+        border-color: #c3e6cb;
+        background-color: #d4edda;
+        color: #155724;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -92,6 +135,44 @@
                         <button type="button" class="btn btn-success w-100" onclick="addProduct()">
                             <i class="fas fa-plus"></i> Add Product
                         </button>
+                        
+                        <!-- Manual Item Section -->
+                        <hr class="my-4">
+                        <div class="mb-3 manual-item-section">
+                            <h6 class="text-muted mb-3">
+                                <i class="bi bi-plus-circle me-2"></i>Add Manual Item
+                            </h6>
+                            <div class="form-text mb-3">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Use this option to add items that are not in your product catalog (e.g., custom services, special orders, or one-time items).
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label for="manual_item_name" class="form-label">Item Name *</label>
+                                    <input type="text" class="form-control" id="manual_item_name" placeholder="Enter item name">
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="manual_quantity" class="form-label">Quantity *</label>
+                                    <input type="number" class="form-control" id="manual_quantity" min="1" value="1">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="manual_unit_price" class="form-label">Unit Price (KSh) *</label>
+                                    <input type="number" class="form-control" id="manual_unit_price" min="0" step="0.01" placeholder="0.00">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="manual_item_notes" class="form-label">Item Notes</label>
+                                    <input type="text" class="form-control" id="manual_item_notes" placeholder="Notes for this item...">
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-outline-primary" onclick="addManualItem()">
+                                    <i class="bi bi-plus-circle me-2"></i>Add Manual Item
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary ms-2" onclick="clearManualItemForm()">
+                                    <i class="bi bi-x-circle me-2"></i>Clear Form
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -103,6 +184,30 @@
                 <h5 class="mb-0">Quotation Items</h5>
             </div>
             <div class="card-body">
+                <!-- Quotation Summary -->
+                <div id="quotationSummary" class="mb-3" style="display: none;">
+                    <div class="row text-center">
+                        <div class="col-md-4">
+                            <div class="border rounded p-2">
+                                <div class="h5 text-primary mb-1" id="totalItems">0</div>
+                                <small class="text-muted">Total Items</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-2">
+                                <div class="h5 text-success mb-1" id="regularItems">0</div>
+                                <small class="text-muted">Regular Products</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-2">
+                                <div class="h5 text-warning mb-1" id="manualItems">0</div>
+                                <small class="text-muted">Manual Items</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <div id="quotationItems">
                     <p class="text-muted">No items added yet.</p>
                 </div>
@@ -202,19 +307,10 @@ function addProduct() {
         return;
     }
     
-    if (quantity > product.stock) {
-        alert(`Only ${product.stock} units available in stock.`);
-        return;
-    }
-    
     // Check if product already exists in quotation
     const existingItem = quotationItems.find(item => item.product_id == productId);
     if (existingItem) {
         existingItem.quantity += quantity;
-        if (existingItem.quantity > product.stock) {
-            alert(`Total quantity (${existingItem.quantity}) exceeds available stock (${product.stock}).`);
-            existingItem.quantity = product.stock;
-        }
     } else {
         quotationItems.push({
             product_id: parseInt(productId),
@@ -235,6 +331,84 @@ function addProduct() {
     document.getElementById('item_notes').value = '';
 }
 
+function addManualItem() {
+    const itemName = document.getElementById('manual_item_name').value.trim();
+    const quantity = parseInt(document.getElementById('manual_quantity').value);
+    const unitPrice = parseFloat(document.getElementById('manual_unit_price').value);
+    const notes = document.getElementById('manual_item_notes').value.trim();
+
+    if (!itemName) {
+        alert('Item name cannot be empty.');
+        document.getElementById('manual_item_name').focus();
+        return;
+    }
+
+    if (!quantity || quantity < 1) {
+        alert('Quantity must be at least 1.');
+        document.getElementById('manual_quantity').focus();
+        return;
+    }
+
+    if (!unitPrice || unitPrice < 0) {
+        alert('Unit price must be a positive number.');
+        document.getElementById('manual_unit_price').focus();
+        return;
+    }
+
+    // Check if item already exists in quotation (case-insensitive)
+    const existingItem = quotationItems.find(item => 
+        item.product_name.toLowerCase() === itemName.toLowerCase()
+    );
+    
+    if (existingItem) {
+        const confirmAdd = confirm(`Item "${itemName}" already exists in the quotation. Do you want to add ${quantity} more units?`);
+        if (confirmAdd) {
+            existingItem.quantity += quantity;
+            updateQuotationItemsDisplay();
+            updateTotal();
+            clearManualItemForm();
+        }
+        return;
+    }
+
+    // Add new manual item
+    quotationItems.push({
+        product_id: null, // No direct product ID for manual items
+        product_name: itemName,
+        quantity: quantity,
+        unit_price: unitPrice,
+        notes: notes
+    });
+
+    updateQuotationItemsDisplay();
+    updateTotal();
+    clearManualItemForm();
+    
+    // Show success message
+    const successMsg = document.createElement('div');
+    successMsg.className = 'alert alert-success alert-dismissible fade show mt-2';
+    successMsg.innerHTML = `
+        <i class="bi bi-check-circle me-2"></i>
+        Manual item "${itemName}" added successfully!
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.querySelector('.manual-item-section').appendChild(successMsg);
+    
+    // Auto-remove success message after 3 seconds
+    setTimeout(() => {
+        if (successMsg.parentNode) {
+            successMsg.remove();
+        }
+    }, 3000);
+}
+
+function clearManualItemForm() {
+    document.getElementById('manual_item_name').value = '';
+    document.getElementById('manual_quantity').value = '1';
+    document.getElementById('manual_unit_price').value = '';
+    document.getElementById('manual_item_notes').value = '';
+}
+
 function removeProduct(index) {
     quotationItems.splice(index, 1);
     updateQuotationItemsDisplay();
@@ -243,11 +417,23 @@ function removeProduct(index) {
 
 function updateQuotationItemsDisplay() {
     const container = document.getElementById('quotationItems');
+    const summaryDiv = document.getElementById('quotationSummary');
     
     if (quotationItems.length === 0) {
         container.innerHTML = '<p class="text-muted">No items added yet.</p>';
+        summaryDiv.style.display = 'none';
         return;
     }
+    
+    // Update summary
+    const regularItems = quotationItems.filter(item => item.product_id !== null).length;
+    const manualItems = quotationItems.filter(item => item.product_id === null).length;
+    const totalItems = quotationItems.length;
+    
+    document.getElementById('totalItems').textContent = totalItems;
+    document.getElementById('regularItems').textContent = regularItems;
+    document.getElementById('manualItems').textContent = manualItems;
+    summaryDiv.style.display = 'block';
     
     let html = `
         <table class="table table-striped">
@@ -266,9 +452,14 @@ function updateQuotationItemsDisplay() {
     
     quotationItems.forEach((item, index) => {
         const total = item.quantity * item.unit_price;
+        const isManualItem = item.product_id === null;
+        
         html += `
-            <tr>
-                <td>${item.product_name}</td>
+            <tr class="${isManualItem ? 'table-warning' : ''}">
+                <td>
+                    ${item.product_name}
+                    ${isManualItem ? '<span class="badge bg-warning text-dark ms-2">Manual</span>' : ''}
+                </td>
                 <td>${item.quantity}</td>
                 <td>KSh${item.unit_price.toFixed(2)}</td>
                 <td>KSh${total.toFixed(2)}</td>

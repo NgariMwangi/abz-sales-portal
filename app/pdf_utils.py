@@ -564,3 +564,246 @@ def create_quotation_pdf(quotation, user_data, output_path):
     doc.build(story)
     
     return output_path 
+
+def create_quotation_pdf_a4(quotation, user_data, output_path):
+    """
+    Create a professional quotation PDF (A4 size)
+    output_path can be a file path (string) or BytesIO object
+    """
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from datetime import datetime
+    import pytz
+    
+    # Set timezone to East Africa Time
+    EAT = pytz.timezone('Africa/Nairobi')
+    
+    # Create PDF buffer
+    if isinstance(output_path, str):
+        # If output_path is a string, create a file
+        doc = SimpleDocTemplate(output_path, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=18)
+    else:
+        # If output_path is BytesIO, use it directly
+        doc = SimpleDocTemplate(output_path, pagesize=A4, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=18)
+    
+    # Container for the 'Flowable' objects
+    elements = []
+    
+    # Define styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=30,
+        alignment=1,  # Center alignment
+        textColor=colors.HexColor('#2c3e50')
+    )
+    
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=16,
+        spaceAfter=20,
+        textColor=colors.HexColor('#34495e')
+    )
+    
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=11,
+        spaceAfter=12
+    )
+    
+    # Recreate the ABZ Hardware letterhead manually
+    
+    # Try to load the logo for the left side
+    try:
+        logo_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'logo.png')
+        if os.path.exists(logo_path):
+            logo_image = Image(logo_path, width=1.5*inch, height=1*inch)
+            logo_cell = logo_image
+        else:
+            # Fallback to text if logo not found
+            logo_cell = Paragraph('''
+            <para align=left>
+            <b><font size=24 color="#1a365d">🔧ABZ</font></b><br/>
+            <b><font size=16 color="#f4b942">HARDWARE</font></b><br/>
+            <b><font size=14 color="#1a365d">LIMITED</font></b>
+            </para>
+            ''', normal_style)
+    except Exception as e:
+        print(f"Error loading logo: {e}")
+        # Fallback to text if logo fails to load
+        logo_cell = Paragraph('''
+        <para align=left>
+        <b><font size=24 color="#1a365d">🔧ABZ</font></b><br/>
+        <b><font size=16 color="#f4b942">HARDWARE</font></b><br/>
+        <b><font size=14 color="#1a365d">LIMITED</font></b>
+        </para>
+        ''', normal_style)
+    
+    # Create the letterhead table for proper layout
+    letterhead_data = [[
+        # Left side - Logo Image
+        logo_cell,
+        
+        # Right side - Contact Information
+        Paragraph('''
+        <para align=right>
+        <b><font size=11 color="#1a365d">Kombo Munyiri Road,</font></b><br/>
+        <b><font size=11 color="#1a365d">Gikomba, Nairobi, Kenya</font></b><br/>
+        <font size=9 color="#666666">0711 732 341 or 0725 000 055</font><br/>
+        <font size=9 color="#666666">info@abzhardware.co.ke</font><br/>
+        <font size=9 color="#666666">www.abzhardware.co.ke</font>
+        </para>
+        ''', normal_style)
+    ]]
+    
+    # Create letterhead table
+    letterhead_table = Table(letterhead_data, colWidths=[3.5*inch, 3.5*inch])
+    letterhead_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (0, 0), 0),
+        ('RIGHTPADDING', (1, 0), (1, 0), 0),
+    ]))
+    
+    elements.append(letterhead_table)
+    elements.append(Spacer(1, 10))
+    
+    # Add the colored line separator (yellow and dark blue)
+    separator_data = [[""]]
+    separator_table = Table(separator_data, colWidths=[7*inch], rowHeights=[0.05*inch])
+    separator_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#f4b942')),  # Yellow color
+    ]))
+    
+    elements.append(separator_table)
+    elements.append(Spacer(1, 30))
+    
+    # Quotation Title
+    elements.append(Paragraph(f"QUOTATION", title_style))
+    elements.append(Spacer(1, 30))
+    
+    # Quotation Details Section
+    customer_info = ""
+    if quotation.customer_name and quotation.customer_name.strip() != "*" and quotation.customer_name.strip():
+        customer_info = f"<b>Customer:</b> {quotation.customer_name}<br/>"
+    
+    valid_until_info = ""
+    if quotation.valid_until:
+        valid_until_info = f"<b>Valid Until:</b> {quotation.valid_until.strftime('%B %d, %Y')}<br/>"
+    
+    quotation_details = f"""
+    <b>Quotation Number:</b> {quotation.quotation_number}<br/>
+    <b>Date:</b> {quotation.created_at.strftime('%B %d, %Y') if quotation.created_at else 'N/A'}<br/>
+    {customer_info}<b>Branch:</b> {quotation.branch.name if quotation.branch else 'N/A'}<br/>
+    {valid_until_info}
+    """
+    elements.append(Paragraph(quotation_details, normal_style))
+    elements.append(Spacer(1, 30))
+    
+    # Items Table
+    if quotation.items:
+        elements.append(Paragraph("ITEMS QUOTED", heading_style))
+        
+        # Table data - Product Name, Quantity, Unit Price, Total Price
+        data = [['Product Name', 'Quantity', 'Unit Price', 'Total Price']]
+        
+        for item in quotation.items:
+            # Get product name - use product_name field if available, otherwise fall back to product.name
+            if hasattr(item, 'product_name') and item.product_name:
+                product_name = item.product_name
+            elif item.product and hasattr(item.product, 'name'):
+                product_name = item.product.name
+            else:
+                product_name = 'N/A'
+            
+            quantity = item.quantity
+            unit_price = item.unit_price
+            total_price = item.unit_price * item.quantity
+            
+            data.append([
+                (product_name or 'N/A').upper(),
+                str(quantity) if quantity else '0',
+                f"KSh {unit_price:,.2f}" if unit_price else 'N/A',
+                f"KSh {total_price:,.2f}" if total_price else 'N/A'
+            ])
+        
+        # Create table with 4 columns
+        table = Table(data, colWidths=[3.5*inch, 1*inch, 1.5*inch, 1.5*inch])
+        table.setStyle(TableStyle([
+            # Header row
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a365d')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 12),
+            
+            # Data rows
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 11),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#4a5568')),
+            
+            # Alternating row colors
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f7fafc'), colors.white]),
+            
+            # Alignment adjustments
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),    # Product Name left
+            ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # Quantity center
+            ('ALIGN', (2, 1), (3, -1), 'RIGHT'),   # Prices right
+            
+            # Padding
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        
+        elements.append(table)
+        elements.append(Spacer(1, 30))
+    else:
+        elements.append(Paragraph("No items in this quotation.", normal_style))
+        elements.append(Spacer(1, 30))
+    
+    # Total Amount
+    if quotation.total_amount:
+        total_data = [['Total Amount:', f"KSh {quotation.total_amount:,.2f}"]]
+        
+        total_table = Table(total_data, colWidths=[2*inch, 2*inch])
+        total_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 12),
+            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#4a5568')),
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#e2e8f0')),
+        ]))
+        
+        elements.append(total_table)
+        elements.append(Spacer(1, 30))
+    
+    # Notes section
+    if quotation.notes:
+        elements.append(Paragraph("NOTES", heading_style))
+        elements.append(Paragraph(quotation.notes, normal_style))
+        elements.append(Spacer(1, 20))
+    
+    # Footer
+    footer_text = f"""
+    <para align=center>
+    <font size=8 color="#95a5a6">
+    Generated on {datetime.now(EAT).strftime('%B %d, %Y at %I:%M %p')} by {user_data.firstname} {user_data.lastname}<br/>
+    This is a computer-generated document and does not require a signature.
+    </font>
+    </para>
+    """
+    elements.append(Spacer(1, 50))
+    elements.append(Paragraph(footer_text, normal_style))
+    
+    # Build PDF
+    doc.build(elements)
+    
+    return output_path 
