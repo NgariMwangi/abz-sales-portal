@@ -26,9 +26,9 @@ class OrderService:
                 # Validate that all items have branch selections
                 for item in order.order_items:
                     if not item.productid or not item.product:
-                        return False, f'Branch selection required for manual item: {item.product_name or "Unknown"}'
+                        return False, f"Branch selection required for manual item: {item.product_name or 'Unknown'}"
                     if str(item.id) not in item_branch_selections:
-                        return False, f'Branch selection required for {item.product.name if item.product else "Unknown Product"}'
+                        return False, f"Branch selection required for {item.product.name if item.product else 'Unknown Product'}"
             
             # Update stock for each item
             for item in order.order_items:
@@ -49,12 +49,12 @@ class OrderService:
                     ).first()
                     
                     if not product_in_branch:
-                        return False, f'Product {item.product.name if item.product else "Unknown"} not available in selected branch'
+                        return False, f"Product {item.product.name if item.product else 'Unknown'} not available in selected branch"
                     
                     # Check stock availability (allow zero stock sales with warning)
                     if product_in_branch.stock < item.quantity:
                         # Allow the order but log a warning about insufficient stock
-                        print(f"Warning: Ordering {item.quantity} units of {item.product.name if item.product else "Unknown"} from branch {product_in_branch.branch.name} but only {product_in_branch.stock} available in stock")
+                        print(f"Warning: Ordering {item.quantity} units of {item.product.name if item.product else 'Unknown'} from branch {product_in_branch.branch.name} but only {product_in_branch.stock} available in stock")
                         # You could also add this to a warnings log or notification system
                     
                     # Update stock from the selected branch
@@ -64,7 +64,7 @@ class OrderService:
                     
                     # Log if stock goes negative (backorder situation)
                     if new_stock < 0:
-                        print(f"Warning: Product {item.product.name if item.product else "Unknown"} stock in branch {product_in_branch.branch.name} is now negative ({new_stock}) after order approval")
+                        print(f"Warning: Product {item.product.name if item.product else 'Unknown'} stock in branch {product_in_branch.branch.name} is now negative ({new_stock}) after order approval")
                     
                     # Create stock transaction record for the selected branch product
                     stock_transaction = StockTransaction(
@@ -74,7 +74,7 @@ class OrderService:
                         quantity=item.quantity,
                         previous_stock=previous_stock,
                         new_stock=new_stock,
-                        notes=f'Order #{order.id} approved - {item.product.name if item.product else "Unknown"} fulfilled from branch {product_in_branch.branch.name}' + (' (backorder)' if new_stock < 0 else '')
+                        notes=f"Order #{order.id} approved - {item.product.name if item.product else 'Unknown'} fulfilled from branch {product_in_branch.branch.name}" + (' (backorder)' if new_stock < 0 else '')
                     )
                     db.session.add(stock_transaction)
                 else:
