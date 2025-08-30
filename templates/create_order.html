@@ -542,7 +542,7 @@ function updateProductSelect() {
     products.forEach(product => {
         const option = document.createElement('option');
         option.value = product.id;
-        option.textContent = `${product.name} - KSh${product.selling_price} (Stock: ${product.stock})`;
+        option.textContent = `${product.name} [${product.product_code}] - KSh${product.selling_price} (Stock: ${product.stock})`;
         select.appendChild(option);
     });
     
