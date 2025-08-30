@@ -121,6 +121,11 @@
         min-width: 120px;
     }
     
+    .table-responsive .table th:nth-child(2),
+    .table-responsive .table td:nth-child(2) {
+        min-width: 100px;
+    }
+    
     .table-responsive .table th:last-child,
     .table-responsive .table td:last-child {
         min-width: 100px;
@@ -142,6 +147,29 @@
         .table-responsive .table input.form-control-sm {
             padding: 0.25rem 0.5rem;
             font-size: 0.75rem;
+            min-width: 60px;
+            width: 100%;
+        }
+        
+        .table-responsive .table .quantity-input {
+            min-width: 70px;
+            width: 100%;
+        }
+        
+        .table-responsive .table .negotiated-price {
+            min-width: 80px;
+            width: 100%;
+        }
+        
+        /* Ensure quantity column has enough space */
+        .table-responsive .table td:nth-child(2) {
+            min-width: 110px !important;
+        }
+        
+        /* Prevent input fields from being cut off */
+        .table-responsive .table input[type="number"] {
+            text-align: center;
+            font-size: 0.875rem;
         }
     }
     
