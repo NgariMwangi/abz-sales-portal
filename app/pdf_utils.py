@@ -713,6 +713,18 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
         # Table data - Product Name, Quantity, Unit Price, Total Price
         data = [['Product Name', 'Quantity', 'Unit Price', 'Total Price']]
         
+        # Create a style for product names that allows wrapping
+        product_name_style = ParagraphStyle(
+            'ProductName',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=0,
+            spaceBefore=0,
+            leading=13,  # Line spacing for multi-line text
+            alignment=0,  # Left alignment
+            fontName='Helvetica'
+        )
+        
         for item in quotation.items:
             # Get product name - use product_name field if available, otherwise fall back to product.name
             if hasattr(item, 'product_name') and item.product_name:
@@ -727,7 +739,7 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
             total_price = item.unit_price * item.quantity
             
             data.append([
-                (product_name or 'N/A').upper(),
+                Paragraph((product_name or 'N/A').upper(), product_name_style),
                 str(quantity) if quantity else '0',
                 f"KSh {unit_price:,.2f}" if unit_price else 'N/A',
                 f"KSh {total_price:,.2f}" if total_price else 'N/A'
@@ -935,6 +947,18 @@ def create_invoice_pdf_a4(invoice_data, user_data, output_path):
         
         data = [['Product Name', 'Quantity', 'Unit Price', 'Total Price']]
         
+        # Create a style for product names that allows wrapping
+        product_name_style = ParagraphStyle(
+            'ProductName',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=0,
+            spaceBefore=0,
+            leading=13,  # Line spacing for multi-line text
+            alignment=0,  # Left alignment
+            fontName='Helvetica'
+        )
+        
         for item in invoice_data['order_items']:
             product_name = item.get('product_name', 'N/A')
             quantity = item.get('quantity', 0)
@@ -942,7 +966,7 @@ def create_invoice_pdf_a4(invoice_data, user_data, output_path):
             total_price = item.get('total', 0)
             
             data.append([
-                (product_name or 'N/A').upper(),
+                Paragraph((product_name or 'N/A').upper(), product_name_style),
                 str(quantity) if quantity else '0',
                 f"KSh {unit_price:,.2f}" if unit_price else 'N/A',
                 f"KSh {total_price:,.2f}" if total_price else 'N/A'

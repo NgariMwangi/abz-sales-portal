@@ -954,16 +954,16 @@ def api_products():
         category_id = request.args.get('category_id', type=int)
         branch_id = request.args.get('branch_id', type=int)
         search = request.args.get('search', '').strip()
-        
+    
         # Start with base query
         query = Product.query.filter_by(display=True)
-        
+    
         # Apply filters
         if category_id:
             query = query.filter_by(subcategory_id=category_id)
         if branch_id:
             query = query.filter_by(branchid=branch_id)
-        
+    
         # Apply search if provided
         if search:
             from sqlalchemy import or_
@@ -979,7 +979,7 @@ def api_products():
         
         # Execute query
         products = query.all()
-        
+    
         # Convert to JSON-serializable format
         result = []
         for p in products:
