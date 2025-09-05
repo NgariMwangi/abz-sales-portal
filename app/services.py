@@ -325,7 +325,7 @@ class OrderService:
                     product_name = product.name
                     
                     # Check stock availability (allow zero stock sales with warning)
-                    if product.stock < quantity:
+                    if product.stock is not None and product.stock < quantity:
                         # Allow the order but log a warning about insufficient stock
                         print(f"Warning: Ordering {quantity} units of {product.name} but only {product.stock} available in stock")
                         # You could also add this to a warnings log or notification system
@@ -604,7 +604,7 @@ class StockService:
         try:
             product = Product.query.get_or_404(product_id)
             
-            if product.stock < quantity:
+            if product.stock is None or product.stock < quantity:
                 raise ValueError('Insufficient stock')
             
             previous_stock = product.stock
