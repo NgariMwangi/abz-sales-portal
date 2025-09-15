@@ -448,6 +448,6 @@ class QuotationItem(db.Model):
     total_price = db.Column(db.Numeric(10, 2), nullable=False)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+    product_name = db.Column(db.String(255), nullable=True)  # For manual items
     # Relationships
     product = db.relationship('Product', backref='quotation_items')
