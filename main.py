@@ -75,9 +75,9 @@ def dashboard():
         if order.approvalstatus:  # Only count approved orders
             for item in order.order_items:
                 if item.final_price is not None:
-                    total_revenue += item.quantity * float(item.final_price)
+                    total_revenue += float(item.quantity) * float(item.final_price)
                 elif item.product.sellingprice is not None:
-                    total_revenue += item.quantity * float(item.product.sellingprice)
+                    total_revenue += float(item.quantity) * float(item.product.sellingprice)
     
     stats = {
         'total_orders': len(walk_in_orders),
@@ -94,9 +94,9 @@ def dashboard():
         total_amount = 0
         for item in order.order_items:
             if item.final_price is not None:
-                total_amount += item.quantity * float(item.final_price)
+                total_amount += float(item.quantity) * float(item.final_price)
             elif item.product.sellingprice is not None:
-                total_amount += item.quantity * float(item.product.sellingprice)
+                total_amount += float(item.quantity) * float(item.product.sellingprice)
         
         recent_orders_data.append({
             'id': order.id,
@@ -235,7 +235,7 @@ def order_detail(order_id):
             final_price = float(item.product.sellingprice)
         else:
             final_price = 0.0  # Fallback to zero if no price available
-        item_total = item.quantity * final_price
+        item_total = float(item.quantity) * final_price
         total_amount += item_total
         
         # Handle original price
@@ -318,7 +318,7 @@ def view_order_invoice(order_id):
         else:
             final_price = 0.0
         
-        item_total = item.quantity * final_price
+        item_total = float(item.quantity) * final_price
         invoice_data['subtotal'] += item_total
         
         # Get product name - use product_name field if available, otherwise fall back to product.name
@@ -414,7 +414,7 @@ def view_order_invoice_browser(order_id):
         else:
             final_price = 0.0
         
-        item_total = item.quantity * final_price
+        item_total = float(item.quantity) * final_price
         invoice_data['subtotal'] += item_total
         
         invoice_data['order_items'].append({
@@ -988,7 +988,7 @@ def api_products():
                 'name': p.name or '',
                 'selling_price': float(p.sellingprice) if p.sellingprice else 0.0,
                 'buyingprice': float(p.buyingprice) if p.buyingprice else 0.0,
-                'stock': int(p.stock) if p.stock else 0,
+                'stock': float(p.stock) if p.stock else 0.0,
                 'product_code': p.productcode or ''
             })
         

@@ -37,7 +37,7 @@
     <div class="card text-bg-info mb-3 h-100">
       <div class="card-body">
         <h5 class="card-title fs-6">Total Revenue</h5>
-        <p class="card-text fs-2">KSh{{ "%.2f"|format(stats.total_revenue) }}</p>
+        <p class="card-text fs-2">KSh{{ "{:,.0f}".format(stats.total_revenue) }}</p>
       </div>
     </div>
   </div>
@@ -76,7 +76,7 @@
           <div class="list-group-item d-flex flex-row justify-content-between align-items-center">
             <div>
               <strong>Order #{{ order.id }}</strong><br>
-              <small class="text-success">KSh{{ "%.2f"|format(order.total_amount) }}</small>
+              <small class="text-success">KSh{{ "{:,.0f}".format(order.total_amount) }}</small>
             </div>
             <div class="d-flex flex-row align-items-center gap-2">
               <span class="badge {% if order.status == 'Approved' %}bg-success{% else %}bg-warning{% endif %}">

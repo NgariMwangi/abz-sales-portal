@@ -48,6 +48,7 @@ class User(db.Model):
     role = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
     phone = db.Column(db.String, nullable=True)
+    accessible_branch_ids = db.Column(db.JSON, nullable=True, default=list)  # Branch access control
     orders = db.relationship('Order', backref='user', lazy=True)
     stock_transactions = db.relationship('StockTransaction', backref='user', lazy=True)
     payments = db.relationship('Payment', backref='user', lazy=True)
@@ -66,6 +67,57 @@ class User(db.Model):
 
     def get_id(self):
         return str(self.id)
+    
+    def check_password(self, password):
+        """Check if the provided password matches the stored hash"""
+        from werkzeug.security import check_password_hash
+        return check_password_hash(self.password, password)
+    
+    def set_password(self, password):
+        """Set a new password with proper hashing"""
+        from werkzeug.security import generate_password_hash
+        self.password = generate_password_hash(password)
+    
+    def is_password_hashed(self):
+        """Check if the password is properly hashed (not plain text)"""
+        return self.password.startswith('pbkdf2:sha256:') or self.password.startswith('scrypt:')
+    
+    # Branch access control methods
+    def has_branch_access(self, branch_id):
+        """Check if user has access to a specific branch"""
+        if self.accessible_branch_ids is None or self.accessible_branch_ids == []:
+            return True  # NULL or empty list means access to all branches
+        return branch_id in self.accessible_branch_ids
+    
+    def add_branch_access(self, branch_id):
+        """Add branch access to user"""
+        if not self.accessible_branch_ids:
+            self.accessible_branch_ids = []
+        if branch_id not in self.accessible_branch_ids:
+            self.accessible_branch_ids.append(branch_id)
+    
+    def remove_branch_access(self, branch_id):
+        """Remove branch access from user"""
+        if self.accessible_branch_ids and branch_id in self.accessible_branch_ids:
+            self.accessible_branch_ids.remove(branch_id)
+    
+    def get_accessible_branches(self):
+        """Get Branch objects for accessible branch IDs"""
+        if self.accessible_branch_ids is None or self.accessible_branch_ids == []:
+            return Branch.query.all()  # All branches if NULL or empty list
+        return Branch.query.filter(Branch.id.in_(self.accessible_branch_ids)).all()
+    
+    def has_all_branch_access(self):
+        """Check if user has access to all branches"""
+        return self.accessible_branch_ids is None or self.accessible_branch_ids == []
+    
+    def set_all_branch_access(self):
+        """Give user access to all branches"""
+        self.accessible_branch_ids = []
+    
+    def clear_branch_access(self):
+        """Remove all branch access from user"""
+        self.accessible_branch_ids = []
 
 class PasswordReset(db.Model):
     __tablename__ = 'password_resets'
@@ -96,7 +148,7 @@ class Product(db.Model):
     image_url = db.Column(db.String, nullable=True)
     buyingprice = db.Column(db.Integer, nullable=True)
     sellingprice = db.Column(db.Integer, nullable=True)
-    stock = db.Column(db.Integer, nullable=True)
+    stock = db.Column(db.Numeric(10, 3), nullable=True)  # Support up to 3 decimal places
     productcode = db.Column(db.String, nullable=True)
     display = db.Column(db.Boolean, default=True)  # Controls visibility in customer app
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
@@ -127,9 +179,9 @@ class StockTransaction(db.Model):
     productid = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     userid = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     transaction_type = db.Column(db.String, nullable=False)  # 'add' or 'remove'
-    quantity = db.Column(db.Integer, nullable=False)
-    previous_stock = db.Column(db.Integer, nullable=False)
-    new_stock = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
+    previous_stock = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
+    new_stock = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     notes = db.Column(db.String, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
 
@@ -163,7 +215,7 @@ class OrderItem(db.Model):
     orderid = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
     productid = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)
     product_name = db.Column(db.String(255), nullable=True)  # Product name for both regular and manual items
-    quantity = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     buying_price = db.Column(db.Numeric(10, 2), nullable=True)  # Product buying price at time of order
     original_price = db.Column(db.Numeric(10, 2), nullable=True)  # Original product selling price
     negotiated_price = db.Column(db.Numeric(10, 2), nullable=True)  # Negotiated price (if any)
@@ -354,10 +406,10 @@ class PurchaseOrderItem(db.Model):
     purchase_order_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'), nullable=False)
     product_code = db.Column(db.String, nullable=False)  # User manually types product code
     product_name = db.Column(db.String, nullable=True)   # User manually types product name
-    quantity = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     unit_price = db.Column(db.Numeric(10, 2), nullable=True)  # Initially null, filled when invoice received
     total_price = db.Column(db.Numeric(10, 2), nullable=True)  # Initially null, calculated when prices are set
-    received_quantity = db.Column(db.Integer, nullable=False, default=0)
+    received_quantity = db.Column(db.Numeric(10, 3), nullable=False, default=0)  # Support up to 3 decimal places
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT))
     updated_at = db.Column(db.DateTime, default=lambda: datetime.now(EAT), onupdate=lambda: datetime.now(EAT))
@@ -390,9 +442,8 @@ class QuotationItem(db.Model):
     __tablename__ = 'quotationitems'
     id = db.Column(db.Integer, primary_key=True)
     quotation_id = db.Column(db.Integer, db.ForeignKey('quotations.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)  # Nullable for manual items
-    product_name = db.Column(db.String(255), nullable=True)  # For manual items
-    quantity = db.Column(db.Integer, nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
     total_price = db.Column(db.Numeric(10, 2), nullable=False)
     notes = db.Column(db.Text, nullable=True)

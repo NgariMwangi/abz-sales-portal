@@ -179,7 +179,7 @@ class OrderService:
                 if not item_data.get('quantity'):
                     raise ValueError('Quantity is required for each item')
                 
-                quantity = int(item_data['quantity'])
+                quantity = float(item_data['quantity'])
                 if quantity <= 0:
                     raise ValueError(f'Invalid quantity for item')
                 
@@ -314,7 +314,7 @@ class OrderService:
                 if not item_data.get('quantity'):
                     raise ValueError('Quantity is required for each item')
                 
-                quantity = int(item_data['quantity'])
+                quantity = float(item_data['quantity'])
                 if quantity <= 0:
                     raise ValueError(f'Invalid quantity for item')
                 
@@ -793,7 +793,7 @@ class QuotationService:
                 if not item_data.get('quantity'):
                     raise ValueError('Quantity is required for each item')
                 
-                quantity = int(item_data['quantity'])
+                quantity = float(item_data['quantity'])
                 if quantity <= 0:
                     raise ValueError(f'Invalid quantity for item')
                 

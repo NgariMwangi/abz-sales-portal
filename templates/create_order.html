@@ -3,36 +3,66 @@
 
 {% block extra_css %}
 <style>
-    .search-input-group {
-        position: relative;
+    /* Modern card styling */
+    .card {
+        border: none;
+        border-radius: 0.75rem;
+        transition: all 0.3s ease;
     }
     
-    .search-input-group .btn {
-        border-left: none;
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
     }
     
-    .search-input-group .form-control {
-        border-right: none;
+    .card-header {
+        border-radius: 0.75rem 0.75rem 0 0 !important;
+        border-bottom: 1px solid rgba(0,0,0,0.1);
     }
     
-    .search-input-group .form-control:focus {
-        border-right: none;
-        box-shadow: none;
+    /* Button styling */
+    .btn {
+        border-radius: 0.5rem;
+        font-weight: 500;
+        transition: all 0.2s ease-in-out;
     }
     
-    .search-input-group .btn:focus {
-        box-shadow: none;
+    .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
     
-    .product-count-info {
-        font-size: 0.875rem;
-        color: #6c757d;
-        font-style: italic;
+    .btn-lg {
+        padding: 0.75rem 1.5rem;
+        font-size: 1.1rem;
     }
     
-    .search-active {
+    /* Form styling */
+    .form-control, .form-select {
+        border-radius: 0.5rem;
+        border: 1px solid #e0e0e0;
+        transition: all 0.2s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
         border-color: #0d6efd;
-        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+    }
+    
+    .form-select-lg {
+        padding: 0.75rem 1rem;
+        font-size: 1.1rem;
+    }
+    
+    /* Search functionality */
+    .searching {
+        border-color: #0d6efd !important;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
+    }
+    
+    .searching::placeholder {
+        color: #0d6efd;
+        font-weight: 500;
     }
     
     .spin {
@@ -44,287 +74,108 @@
         to { transform: rotate(360deg); }
     }
     
-    /* Search input styling */
-    .searching {
-        border-color: #0d6efd !important;
-        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
-    }
-    
-    .searching::placeholder {
-        color: #0d6efd;
-        font-weight: 500;
-    }
-    
-    #product_search.is-valid {
-        border-color: #198754;
-        box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
-    }
-    
-    #product_search:focus {
-        border-color: #0d6efd;
-        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
-    }
-    
-    /* Button transitions */
-    .btn {
-        transition: all 0.2s ease-in-out;
-    }
-    
-    .btn:hover {
-        transform: translateY(-1px);
-    }
-    
     /* Product count styling */
-    #product_count .text-success {
-        color: #198754 !important;
+    .product-count-info {
+        font-size: 0.875rem;
+        color: #6c757d;
+        font-style: italic;
     }
     
-    #product_count .text-info {
-        color: #0dcaf0 !important;
+    /* Table styling */
+    .table {
+        border-radius: 0.5rem;
+        overflow: hidden;
     }
     
-    #product_count .text-danger {
-        color: #dc3545 !important;
+    .table th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        color: #495057;
     }
     
-    #product_count .text-muted {
-        color: #6c757d !important;
+    .table-hover tbody tr:hover {
+        background-color: rgba(13, 110, 253, 0.05);
     }
     
-    /* Manual item styling */
+    /* Item type styling */
     .table-warning {
         background-color: rgba(255, 193, 7, 0.1) !important;
+        border-left: 4px solid #ffc107;
     }
     
     .table-warning:hover {
         background-color: rgba(255, 193, 7, 0.2) !important;
     }
     
-    /* Responsive table styling */
-    .table-responsive {
-        border-radius: 0.375rem;
-        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    }
-    
-    .table-responsive .table {
-        margin-bottom: 0;
-    }
-    
-    .table-responsive .table th,
-    .table-responsive .table td {
-        white-space: nowrap;
-        min-width: 80px;
-    }
-    
-    .table-responsive .table th:first-child,
-    .table-responsive .table td:first-child {
-        min-width: 120px;
-    }
-    
-    .table-responsive .table th:nth-child(2),
-    .table-responsive .table td:nth-child(2) {
-        min-width: 80px;
-    }
-    
-    /* Ensure quantity column is always visible */
-    .table-responsive .table .quantity-cell {
-        min-width: 80px;
-        width: 100%;
-        padding: 0.5rem;
-    }
-    
-    /* Ensure quantity input has enough space */
-    .table-responsive .table .quantity-input {
-        min-width: 70px;
-        width: 100%;
-        padding: 0.375rem 0.75rem;
-        text-align: center;
-        font-size: 0.875rem;
-        box-sizing: border-box;
-    }
-    
-    .table-responsive .table .quantity-input {
-        min-width: 70px;
-        width: 100%;
-        padding: 0.375rem 0.75rem;
-        text-align: center;
-        font-size: 0.875rem;
-    }
-    
-    .table-responsive .table th:last-child,
-    .table-responsive .table td:last-child {
-        min-width: 100px;
-    }
-    
-    /* Mobile-specific adjustments */
-    @media (max-width: 768px) {
-        .table-responsive .table th,
-        .table-responsive .table td {
-            font-size: 0.875rem;
-            padding: 0.5rem 0.25rem;
-        }
-        
-        .table-responsive .table .btn-sm {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-        }
-        
-        .table-responsive .table input.form-control-sm {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-            min-width: 60px;
-            width: 100%;
-        }
-        
-        .table-responsive .table .quantity-input {
-            min-width: 70px;
-            width: 100%;
-        }
-        
-        .table-responsive .table .negotiated-price {
-            min-width: 80px;
-            width: 100%;
-        }
-        
-        /* Ensure quantity column has enough space */
-        .table-responsive .table td:nth-child(2) {
-            min-width: 110px !important;
-        }
-        
-        /* Prevent input fields from being cut off */
-        .table-responsive .table input[type="number"] {
-            text-align: center;
-            font-size: 0.875rem;
-        }
-        
-        /* Ensure quantity input is always visible */
-        .table-responsive .table .quantity-input {
-            background-color: #ffffff !important;
-            border: 1px solid #ced4da !important;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.075) !important;
-        }
-        
-        .table-responsive .table .quantity-input:focus {
-            border-color: #86b7fe !important;
-            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
-        }
-    }
-    
-    /* Extra small devices (phones) */
-    @media (max-width: 576px) {
-        .table-responsive .table th:nth-child(2),
-        .table-responsive .table td:nth-child(2) {
-            min-width: 80px;
-            width: 100%;
-        }
-        
-        .table-responsive .table .quantity-input {
-            min-width: 70px;
-            width: 100%;
-            font-size: 1rem;
-            padding: 0.5rem 0.75rem;
-            text-align: center;
-        }
-        
-        .table-responsive .table td:nth-child(2) {
-            padding: 0.5rem;
-        }
-        
-        .table-responsive .table .quantity-cell {
-            background-color: rgba(13, 110, 253, 0.05);
-            border-left: 3px solid #0d6efd;
-        }
-        
-        /* Additional mobile optimizations */
-        .table-responsive .table th:first-child,
-        .table-responsive .table td:first-child {
-            min-width: 100px;
-            width: 100px;
-        }
-        
-        .table-responsive .table th:nth-child(3),
-        .table-responsive .table td:nth-child(3) {
-            min-width: 80px;
-            width: 80px;
-        }
-        
-        .table-responsive .table th:nth-child(4),
-        .table-responsive .table td:nth-child(4) {
-            min-width: 80px;
-            width: 80px;
-        }
-    }
-    
-    /* Extremely small devices */
-    @media (max-width: 480px) {
-        .table-responsive .table th:nth-child(2),
-        .table-responsive .table td:nth-child(2) {
-            min-width: 80px;
-            width: 100%;
-        }
-        
-        .table-responsive .table .quantity-input {
-            min-width: 70px;
-            width: 100%;
-        }
-        
-        .table-responsive .table .quantity-cell {
-            min-width: 80px;
-            width: 100%;
-        }
-    }
-    
-    .manual-item-badge {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
-    }
-    
-    /* Backorder styling */
     .table-danger {
-        background-color: #f8d7da !important;
+        background-color: rgba(220, 53, 69, 0.1) !important;
+        border-left: 4px solid #dc3545;
     }
     
     .table-danger:hover {
-        background-color: #f5c6cb !important;
+        background-color: rgba(220, 53, 69, 0.2) !important;
     }
     
-    .badge.bg-danger {
+    /* Badge styling */
+    .badge {
         font-size: 0.75em;
-        padding: 0.25em 0.5em;
+        padding: 0.35em 0.65em;
+        border-radius: 0.375rem;
     }
     
-    /* Manual item form styling */
-    .manual-item-section {
-        border: 1px solid #dee2e6;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        background-color: #f8f9fa;
+    /* Input group styling */
+    .input-group .btn {
+        border-radius: 0;
     }
     
-    .manual-item-section h6 {
-        color: #6c757d;
-        font-weight: 600;
+    .input-group .btn:first-child {
+        border-top-left-radius: 0.5rem;
+        border-bottom-left-radius: 0.5rem;
     }
     
-    /* Order summary styling */
-    .order-summary .border {
-        transition: all 0.3s ease;
+    .input-group .btn:last-child {
+        border-top-right-radius: 0.5rem;
+        border-bottom-right-radius: 0.5rem;
     }
     
-    .order-summary .border:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    .input-group .form-control:first-child {
+        border-top-left-radius: 0.5rem;
+        border-bottom-left-radius: 0.5rem;
     }
     
-    .order-summary .text-info {
-        color: #0dcaf0 !important;
+    .input-group .form-control:last-child {
+        border-top-right-radius: 0.5rem;
+        border-bottom-right-radius: 0.5rem;
+    }
+    
+    /* Summary cards */
+    .card.bg-primary.bg-opacity-10 {
+        background-color: rgba(13, 110, 253, 0.1) !important;
+        border-color: rgba(13, 110, 253, 0.2) !important;
+    }
+    
+    .card.bg-success.bg-opacity-10 {
+        background-color: rgba(25, 135, 84, 0.1) !important;
+        border-color: rgba(25, 135, 84, 0.2) !important;
+    }
+    
+    .card.bg-warning.bg-opacity-10 {
+        background-color: rgba(255, 193, 7, 0.1) !important;
+        border-color: rgba(255, 193, 7, 0.2) !important;
+    }
+    
+    .card.bg-danger.bg-opacity-10 {
+        background-color: rgba(220, 53, 69, 0.1) !important;
+        border-color: rgba(220, 53, 69, 0.2) !important;
+    }
+    
+    .card.bg-info.bg-opacity-10 {
+        background-color: rgba(13, 202, 240, 0.1) !important;
+        border-color: rgba(13, 202, 240, 0.2) !important;
     }
     
     /* Profit display styling */
-    #totalProfit {
-        font-weight: 700;
-    }
-    
     .profit-positive {
         color: #198754 !important;
     }
@@ -332,180 +183,432 @@
     .profit-negative {
         color: #dc3545 !important;
     }
+    
+    /* Alert styling */
+    .alert {
+        border-radius: 0.5rem;
+        border: none;
+    }
+    
+    .alert-info {
+        background-color: rgba(13, 202, 240, 0.1);
+        color: #0c5460;
+        border-left: 4px solid #0dcaf0;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .card {
+            margin-bottom: 1rem;
+        }
+        
+        .table-responsive {
+            border-radius: 0.5rem;
+        }
+        
+        .btn-lg {
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+        }
+        
+        .form-select-lg {
+            padding: 0.5rem 0.75rem;
+            font-size: 1rem;
+        }
+        
+        /* Mobile-specific table improvements */
+        .table th, .table td {
+            padding: 0.5rem 0.25rem;
+            font-size: 0.875rem;
+        }
+        
+        .table .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        /* Mobile input group improvements */
+        .input-group .form-control {
+            min-width: 60px;
+        }
+        
+        .input-group .btn {
+            padding: 0.25rem 0.5rem;
+        }
+        
+        /* Mobile summary cards */
+        .card.bg-primary.bg-opacity-10,
+        .card.bg-success.bg-opacity-10,
+        .card.bg-warning.bg-opacity-10,
+        .card.bg-danger.bg-opacity-10,
+        .card.bg-info.bg-opacity-10 {
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Mobile help panel */
+        .card.bg-light .row .col-4 {
+            padding: 0.25rem;
+        }
+        
+        .card.bg-light .row .col-4 small {
+            font-size: 0.75rem;
+        }
+    }
+    
+    /* Extra small devices */
+    @media (max-width: 576px) {
+        .container-fluid {
+            padding: 0.5rem;
+        }
+        
+        .card-body {
+            padding: 1rem 0.75rem;
+        }
+        
+        .btn-lg {
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+        }
+        
+        /* Stack columns on very small screens */
+        .row.g-3 > [class*="col-"] {
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Improve table readability on small screens */
+        .table-responsive {
+            font-size: 0.8rem;
+        }
+        
+        .table th, .table td {
+            padding: 0.375rem 0.25rem;
+        }
+        
+        /* Make badges smaller on mobile */
+        .badge {
+            font-size: 0.7em;
+            padding: 0.25em 0.5em;
+        }
+        
+        /* Improve alert spacing on mobile */
+        .alert {
+            margin-bottom: 0.5rem;
+            padding: 0.5rem 0.75rem;
+        }
+    }
+    
+    /* Loading states */
+    .loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+    
+    /* Success animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .fade-in-up {
+        animation: fadeInUp 0.3s ease-out;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Create New Walk-in Order</h2>
-    <a href="{{ url_for('orders_page') }}" class="btn btn-secondary">Back to Orders</a>
-</div>
-
-<form id="createOrderForm" method="POST">
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Order Information</h5>
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1">
+                        <i class="bi bi-cart-plus text-primary me-2"></i>
+                        Create New Walk-in Order
+                    </h2>
+                    <p class="text-muted mb-0">Add products and create a new walk-in order for your customer</p>
                 </div>
-                <div class="card-body">
-                    <input type="hidden" id="order_type_id" name="order_type_id" value="{{ walk_in_order_type_id }}">
-                    <div class="mb-3">
-                        <label for="branch_id" class="form-label">Branch *</label>
-                        <select class="form-select" id="branch_id" name="branch_id" required>
-                            <option value="">Select Branch</option>
-                            {% for branch in branches %}
-                            <option value="{{ branch.id }}">{{ branch.name }} - {{ branch.location }}</option>
-                            {% endfor %}
-                        </select>
-                        <div class="form-text">Select the branch where this walk-in order will be processed</div>
-                    </div>
-                </div>
+                <a href="{{ url_for('orders_page') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>Back to Orders
+                </a>
             </div>
         </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Product Selection</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label for="category_filter" class="form-label">Filter by Category</label>
-                        <select class="form-select" id="category_filter">
-                            <option value="">All Categories</option>
-                            {% for subcategory in subcategories %}
-                            <option value="{{ subcategory.id }}">{{ subcategory.category.name }} - {{ subcategory.name }}</option>
-                            {% endfor %}
-                        </select>
+    </div>
+
+    <form id="createOrderForm" method="POST">
+        <div class="row">
+            <!-- Left Column: Order Setup -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-gear me-2"></i>Order Setup
+                        </h5>
                     </div>
-                    <div class="mb-3">
-                        <label for="product_search" class="form-label">Search Products</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="product_search" placeholder="Type to search products...">
-                            <button class="btn btn-primary" type="button" id="searchBtn">
-                                <i class="bi bi-search"></i> Search
-                            </button>
-                            <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn" style="display: none;">
-                                <i class="bi bi-x"></i> Clear
-                            </button>
-                        </div>
-                        <div class="form-text">Search by product name, code, price, or stock</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="product_select" class="form-label">Product</label>
-                        <select class="form-select" id="product_select">
-                            <option value="">Select Branch First</option>
-                        </select>
-                        <div class="form-text">
-                            <span id="product_count" class="product-count-info">Please select a branch above to view available products</span>
-                            <br>
-                            <small class="text-info">
+                    <div class="card-body">
+                        <input type="hidden" id="order_type_id" name="order_type_id" value="{{ walk_in_order_type_id }}">
+                        
+                        <!-- Branch Selection -->
+                        <div class="mb-4">
+                            <label for="branch_id" class="form-label fw-semibold">
+                                <i class="bi bi-building me-1"></i>Branch *
+                            </label>
+                            <select class="form-select" id="branch_id" name="branch_id" required>
+                                <option value="">Choose a branch...</option>
+                                {% for branch in branches %}
+                                <option value="{{ branch.id }}">{{ branch.name }} - {{ branch.location }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">
                                 <i class="bi bi-info-circle me-1"></i>
-                                You can sell products even with zero stock - the system will create backorders automatically.
-                            </small>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="quantity" class="form-label">Quantity</label>
-                        <input type="number" class="form-control" id="quantity" min="1" value="1">
-                    </div>
-                    <button type="button" class="btn btn-primary" onclick="addProduct()">Add Product</button>
-                    
-                    <!-- Manual Item Section -->
-                    <hr class="my-4">
-                    <div class="mb-3 manual-item-section">
-                        <h6 class="text-muted mb-3">
-                            <i class="bi bi-plus-circle me-2"></i>Add Manual Item
-                        </h6>
-                        <div class="form-text mb-3">
-                            <i class="bi bi-info-circle me-1"></i>
-                            Use this option to add items that are not in your product catalog (e.g., custom services, special orders, or one-time items).
-                        </div>
-                        <div class="row">
-                            <div class="col-md-4">
-                                <label for="manual_item_name" class="form-label">Item Name *</label>
-                                <input type="text" class="form-control" id="manual_item_name" placeholder="Enter item name">
-                            </div>
-                            <div class="col-md-2">
-                                <label for="manual_quantity" class="form-label">Quantity *</label>
-                                <input type="number" class="form-control" id="manual_quantity" min="1" value="1">
-                            </div>
-                            <div class="col-md-3">
-                                <label for="manual_buying_price" class="form-label">Buying Price (KSh)</label>
-                                <input type="number" class="form-control" id="manual_buying_price" min="0" step="0.01" placeholder="Cost price">
-                                <div class="form-text small">Leave empty if not applicable</div>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="manual_price" class="form-label">Selling Price (KSh) *</label>
-                                <input type="number" class="form-control" id="manual_price" min="0" step="0.01" placeholder="0.00">
+                                Select the branch where this order will be processed
                             </div>
                         </div>
-                        <div class="mt-3">
-                            <button type="button" class="btn btn-outline-primary" onclick="addManualItem()">
-                                <i class="bi bi-plus-circle me-2"></i>Add Manual Item
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary ms-2" onclick="clearManualItemForm()">
-                                <i class="bi bi-x-circle me-2"></i>Clear Form
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <div class="card mt-4">
-        <div class="card-header">
-            <h5 class="mb-0">Order Items</h5>
-        </div>
-        <div class="card-body">
-            <!-- Order Summary -->
-            <div id="orderSummary" class="mb-3 order-summary" style="display: none;">
-                <div class="row text-center">
-                    <div class="col-md-2">
-                        <div class="border rounded p-2">
-                            <div class="h5 text-primary mb-1" id="totalItems">0</div>
-                            <small class="text-muted">Total Items</small>
+                        <!-- Quick Stats -->
+                        <div id="quickStats" class="row g-2 mb-4" style="display: none;">
+                            <div class="col-6">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center py-2">
+                                        <div class="h6 mb-0 text-primary" id="quickTotalItems">0</div>
+                                        <small class="text-muted">Items</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center py-2">
+                                        <div class="h6 mb-0 text-success" id="quickTotalAmount">KSh0</div>
+                                        <small class="text-muted">Total</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+
                     </div>
-                    <div class="col-md-2">
-                        <div class="border rounded p-2">
-                            <div class="h5 text-success mb-1" id="regularItems">0</div>
-                            <small class="text-muted">Regular Products</small>
+                </div>
+            </div>
+
+            <!-- Right Column: Product Selection -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">
+                            <i class="bi bi-search me-2"></i>Add Products
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Search and Filter Section -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label for="category_filter" class="form-label fw-semibold">
+                                    <i class="bi bi-funnel me-1"></i>Category Filter
+                                </label>
+                                <select class="form-select" id="category_filter">
+                                    <option value="">All Categories</option>
+                                    {% for subcategory in subcategories %}
+                                    <option value="{{ subcategory.id }}">{{ subcategory.category.name }} - {{ subcategory.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="product_search" class="form-label fw-semibold">
+                                    <i class="bi bi-search me-1"></i>Search Products
+                                </label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="product_search" placeholder="Search by name, code, or price...">
+                                    <button class="btn btn-outline-primary" type="button" id="searchBtn">
+                                        <i class="bi bi-search"></i>
+                                    </button>
+                                    <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn" style="display: none;">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-md-2">
-                        <div class="border rounded p-2">
-                            <div class="h5 text-warning mb-1" id="manualItems">0</div>
-                            <small class="text-muted">Manual Items</small>
+
+                        <!-- Product Selection -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-8">
+                                <label for="product_select" class="form-label fw-semibold">
+                                    <i class="bi bi-box me-1"></i>Select Product
+                                </label>
+                                <select class="form-select" id="product_select">
+                                    <option value="">Select a branch first...</option>
+                                </select>
+                                <div class="form-text">
+                                    <span id="product_count" class="product-count-info">Please select a branch above to view available products</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="quantity" class="form-label fw-semibold">
+                                    <i class="bi bi-123 me-1"></i>Quantity
+                                </label>
+                                <div class="input-group">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="decreaseQuantity()">
+                                        <i class="bi bi-dash"></i>
+                                    </button>
+                                    <input type="number" class="form-control text-center" id="quantity" min="0.01" step="0.01" value="">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="increaseQuantity()">
+                                        <i class="bi bi-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-2">
-                            <div class="h5 text-danger mb-1" id="backorderItems">0</div>
-                            <small class="text-muted">Backorders</small>
+
+                        <!-- Add Product Button -->
+                        <div class="d-grid">
+                            <button type="button" class="btn btn-primary btn-lg" onclick="addProduct()">
+                                <i class="bi bi-plus-circle me-2"></i>Add to Order
+                            </button>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="border rounded p-2">
-                            <div class="h5 mb-1" id="totalProfit">KSh0.00</div>
-                            <small class="text-muted">Total Profit</small>
+                        
+                    
+                        
+                        <!-- Manual Item Section -->
+                        <div class="mt-4">
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning bg-opacity-10">
+                                    <h6 class="mb-0 text-warning">
+                                        <i class="bi bi-plus-circle me-2"></i>Add Manual Item
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-info alert-sm mb-3">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        <strong>Manual Items:</strong> Add items not in your catalog (services, special orders, etc.)
+                                    </div>
+                                    
+                                    <div class="row g-3">
+                                        <div class="col-md-5">
+                                            <label for="manual_item_name" class="form-label fw-semibold">Item Name *</label>
+                                            <input type="text" class="form-control" id="manual_item_name" placeholder="Enter item name">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label for="manual_quantity" class="form-label fw-semibold">Qty *</label>
+                                            <input type="number" class="form-control" id="manual_quantity" min="0.01" step="0.01" value="1">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label for="manual_buying_price" class="form-label fw-semibold">Cost (KSh)</label>
+                                            <input type="number" class="form-control" id="manual_buying_price" min="0" step="0.01" placeholder="0.00">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label for="manual_price" class="form-label fw-semibold">Price (KSh) *</label>
+                                            <input type="number" class="form-control" id="manual_price" min="0" step="0.01" placeholder="0.00">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-3 d-flex gap-2">
+                                        <button type="button" class="btn btn-warning" onclick="addManualItem()">
+                                            <i class="bi bi-plus-circle me-2"></i>Add Manual Item
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="clearManualItemForm()">
+                                            <i class="bi bi-x-circle me-2"></i>Clear
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <div id="orderItems">
-                <p class="text-muted">No items added yet. Add products to create your walk-in order.</p>
-            </div>
-            <div class="d-flex justify-content-between align-items-center mt-3">
-                <h4>Total: KSh<span id="totalAmount">0.00</span></h4>
-                <button type="submit" class="btn btn-success" id="createOrderBtn" disabled>Create Walk-in Order</button>
+        </div>
+
+        <!-- Order Items Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">
+                            <i class="bi bi-list-ul me-2"></i>Order Items
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Order Summary Cards -->
+                        <div id="orderSummary" class="mb-4" style="display: none;">
+                            <div class="row g-3">
+                                <div class="col-lg-2 col-md-4 col-sm-6">
+                                    <div class="card bg-primary bg-opacity-10 border-primary h-100">
+                                        <div class="card-body text-center py-3">
+                                            <div class="h3 text-primary mb-1" id="totalItems">0</div>
+                                            <small class="text-muted fw-semibold">Total Items</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-sm-6">
+                                    <div class="card bg-success bg-opacity-10 border-success h-100">
+                                        <div class="card-body text-center py-3">
+                                            <div class="h3 text-success mb-1" id="regularItems">0</div>
+                                            <small class="text-muted fw-semibold">Products</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-sm-6">
+                                    <div class="card bg-warning bg-opacity-10 border-warning h-100">
+                                        <div class="card-body text-center py-3">
+                                            <div class="h3 text-warning mb-1" id="manualItems">0</div>
+                                            <small class="text-muted fw-semibold">Manual Items</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2 col-md-4 col-sm-6">
+                                    <div class="card bg-danger bg-opacity-10 border-danger h-100">
+                                        <div class="card-body text-center py-3">
+                                            <div class="h3 text-danger mb-1" id="backorderItems">0</div>
+                                            <small class="text-muted fw-semibold">Backorders</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 col-md-8 col-sm-12">
+                                    <div class="card bg-info bg-opacity-10 border-info h-100">
+                                        <div class="card-body text-center py-3">
+                                            <div class="h3 mb-1" id="totalProfit">KSh0.00</div>
+                                            <small class="text-muted fw-semibold">Total Profit</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Order Items Table -->
+                        <div id="orderItems">
+                            <div class="text-center py-5">
+                                <i class="bi bi-cart-x text-muted" style="font-size: 3rem;"></i>
+                                <h5 class="text-muted mt-3">No items added yet</h5>
+                                <p class="text-muted">Start by selecting a branch and adding products to create your order</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="mt-4 pt-3 border-top">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center">
+                                        <h4 class="mb-0 me-3">Total: KSh<span id="totalAmount">0.00</span></h4>
+                                        <button type="button" class="btn btn-outline-danger" id="clearOrderBtn" onclick="clearAllItems()" style="display: none;">
+                                            <i class="bi bi-trash me-2"></i>Clear All Items
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 text-md-end">
+                                    <button type="submit" class="btn btn-success btn-lg" id="createOrderBtn" disabled>
+                                        <i class="bi bi-check-circle me-2"></i>Create Order
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-</form>
+    </form>
+</div>
 
 <input type="hidden" id="orderItemsData" name="items" value="[]">
 {% endblock %}
@@ -565,7 +668,49 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
     });
+    
+    // Add keyboard shortcuts for better UX
+    document.addEventListener('keydown', function(e) {
+        // Ctrl/Cmd + Enter to add product
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            addProduct();
+        }
+        
+        // Escape to clear search
+        if (e.key === 'Escape' && searchQuery) {
+            e.preventDefault();
+            clearSearch();
+        }
+        
+        // Ctrl/Cmd + K to focus search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            searchInput.focus();
+        }
+    });
+    
+    // Add tooltips and help text
+    addHelpTooltips();
+    
+    // Focus on branch selection when page loads
+    document.getElementById('branch_id').focus();
 });
+
+function addHelpTooltips() {
+    // Add helpful tooltips to key elements
+    const branchSelect = document.getElementById('branch_id');
+    branchSelect.title = 'Select the branch where this order will be processed';
+    
+    const productSearch = document.getElementById('product_search');
+    productSearch.title = 'Search by product name, code, or price. Press Enter to search.';
+    
+    const quantityInput = document.getElementById('quantity');
+    quantityInput.title = 'Enter the quantity to order (supports decimals like 0.5). Use +/- buttons or type directly.';
+    
+    const addButton = document.querySelector('button[onclick="addProduct()"]');
+    addButton.title = 'Add the selected product to your order (Ctrl+Enter)';
+}
 
 function performSearch() {
     const searchInput = document.getElementById('product_search');
@@ -588,19 +733,40 @@ function performSearch() {
         searchInput.classList.add('is-valid');
         
         // Show loading state in clear button temporarily
-        clearSearchBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Searching...';
+        clearSearchBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i>';
         clearSearchBtn.disabled = true;
         
         // Add visual feedback to search input
         searchInput.classList.add('searching');
+        
+        // Show search indicator
+        showSearchIndicator('Searching...');
     } else {
         searchBtn.style.display = 'block';
         clearSearchBtn.style.display = 'none';
         searchInput.classList.remove('is-valid', 'searching');
+        hideSearchIndicator();
     }
     
     // Load products with search
     loadProducts();
+}
+
+function showSearchIndicator(message) {
+    const productCount = document.getElementById('product_count');
+    productCount.innerHTML = `
+        <div class="d-flex align-items-center text-primary">
+            <i class="bi bi-arrow-clockwise spin me-2"></i>
+            <span>${message}</span>
+        </div>
+    `;
+}
+
+function hideSearchIndicator() {
+    const productCount = document.getElementById('product_count');
+    if (!searchQuery) {
+        productCount.innerHTML = 'Please select a branch above to view available products';
+    }
 }
 
 function clearSearch() {
@@ -633,9 +799,16 @@ function loadProducts() {
         return;
     }
     
-    // Show loading state
+    // Show loading state with better visual feedback
     const productCount = document.getElementById('product_count');
-    productCount.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Loading products...';
+    if (!searchQuery) {
+        productCount.innerHTML = `
+            <div class="d-flex align-items-center text-primary">
+                <i class="bi bi-arrow-clockwise spin me-2"></i>
+                <span>Loading products...</span>
+            </div>
+        `;
+    }
     
     // Build API URL
     const params = new URLSearchParams();
@@ -644,6 +817,10 @@ function loadProducts() {
     if (searchQuery) params.append('search', searchQuery);
     
     const url = `/api/products?${params.toString()}`;
+    
+    // Add loading class to form
+    const productSelect = document.getElementById('product_select');
+    productSelect.classList.add('loading');
     
     // Fetch products
     fetch(url)
@@ -665,22 +842,31 @@ function loadProducts() {
             // Reset clear button state if search was performed
             if (searchQuery) {
                 const clearSearchBtn = document.getElementById('clearSearchBtn');
-                clearSearchBtn.innerHTML = '<i class="bi bi-x"></i> Clear';
+                clearSearchBtn.innerHTML = '<i class="bi bi-x"></i>';
                 clearSearchBtn.disabled = false;
             }
         })
         .catch(error => {
             console.error('Error loading products:', error);
-            productCount.innerHTML = `<span class="text-danger">Error loading products: ${error.message}</span>`;
+            productCount.innerHTML = `
+                <div class="alert alert-danger alert-sm mb-0">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Error loading products:</strong> ${error.message}
+                </div>
+            `;
             products = [];
             updateProductSelect();
             
             // Reset clear button state on error
             if (searchQuery) {
                 const clearSearchBtn = document.getElementById('clearSearchBtn');
-                clearSearchBtn.innerHTML = '<i class="bi bi-x"></i> Clear';
+                clearSearchBtn.innerHTML = '<i class="bi bi-x"></i>';
                 clearSearchBtn.disabled = false;
             }
+        })
+        .finally(() => {
+            // Remove loading class
+            productSelect.classList.remove('loading');
         });
 }
 
@@ -716,23 +902,49 @@ function updateProductSelect() {
     products.forEach(product => {
         const option = document.createElement('option');
         option.value = product.id;
-        option.textContent = `${product.name} [${product.product_code}] - KSh${product.selling_price} (Stock: ${product.stock})`;
+        option.textContent = `${product.name} [${product.product_code}] - KSh${product.selling_price} (Stock: ${product.stock.toFixed(2)})`;
         select.appendChild(option);
     });
     
-    // Update product count display
+    // Update product count display with better visual feedback
     if (searchQuery) {
         const searchTime = new Date().toLocaleTimeString();
+        if (products.length > 0) {
+            productCount.innerHTML = `
+                <div class="alert alert-success alert-sm mb-0">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>
+                            <i class="bi bi-check-circle me-2"></i>
+                            Found <strong>${products.length}</strong> product${products.length === 1 ? '' : 's'} matching "<strong>${searchQuery}</strong>"
+                        </span>
+                        <small class="text-muted">${searchTime}</small>
+                    </div>
+                </div>
+            `;
+        } else {
+            productCount.innerHTML = `
+                <div class="alert alert-warning alert-sm mb-0">
+                    <div class="text-center">
+                        <div class="text-warning mb-2">
+                            <i class="bi bi-search"></i> No products found matching "<strong>${searchQuery}</strong>"
+                        </div>
+                        <div class="text-muted small">
+                            Try: 
+                            <button type="button" class="btn btn-link btn-sm p-0" onclick="clearSearch()">clearing the search</button>, 
+                            <button type="button" class="btn btn-link btn-sm p-0" onclick="document.getElementById('category_filter').value='';loadProducts()">removing category filter</button>, 
+                            or using different keywords
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    } else {
         productCount.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center">
-                <span class="text-success">
-                    <i class="bi bi-search"></i> Found <strong>${products.length}</strong> product${products.length === 1 ? '' : 's'} matching "<strong>${searchQuery}</strong>"
-                </span>
-                <small class="text-muted">${searchTime}</small>
+            <div class="alert alert-info alert-sm mb-0">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>${products.length}</strong> product${products.length === 1 ? '' : 's'} available
             </div>
         `;
-    } else {
-        productCount.innerHTML = `<span class="text-info"><strong>${products.length}</strong> product${products.length === 1 ? '' : 's'} available</span>`;
     }
 }
 
@@ -750,75 +962,131 @@ function updateProductInfo() {
 
 function addProduct() {
     const productId = document.getElementById('product_select').value;
-    const quantity = parseInt(document.getElementById('quantity').value);
+    const quantity = parseFloat(document.getElementById('quantity').value);
     
+    // Enhanced validation with better user feedback
     if (!productId) {
-        alert('Please select a product.');
+        showValidationError('Please select a product from the dropdown.', 'product_select');
         return;
     }
     
-    if (!quantity || quantity < 1) {
-        alert('Please enter a valid quantity.');
+    if (!quantity || quantity < 0.01) {
+        showValidationError('Please enter a valid quantity (minimum 0.01).', 'quantity');
         return;
     }
     
     const product = products.find(p => p.id == productId);
     if (!product) {
-        alert('Product not found.');
+        showValidationError('Selected product not found. Please refresh and try again.', 'product_select');
         return;
     }
     
-    if (quantity > product.stock) {
-        // Allow the order but show a warning about insufficient stock
-        const confirmLowStock = confirm(
-            `Warning: You're ordering ${quantity} units of ${product.name}, but only ${product.stock} are available in stock.\n\n` +
-            `This will create a backorder. Do you want to continue?`
-        );
-        
-        if (!confirmLowStock) {
-            return;
-        }
-    }
+    // Stock check removed - items will be added automatically regardless of stock level
     
+    // Clear any previous validation errors
+    clearValidationErrors();
+    
+    // Proceed with adding the product
+    addProductToOrder(product, quantity);
+}
+
+function showValidationError(message, fieldId) {
+    // Remove any existing error messages
+    clearValidationErrors();
+    
+    // Create error message
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'alert alert-danger alert-sm mt-2 fade-in-up';
+    errorDiv.innerHTML = `
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        ${message}
+    `;
+    
+    // Insert error message after the relevant field
+    const field = document.getElementById(fieldId);
+    if (field) {
+        field.classList.add('is-invalid');
+        field.parentNode.insertBefore(errorDiv, field.nextSibling);
+        
+        // Auto-remove error after 5 seconds
+        setTimeout(() => {
+            if (errorDiv.parentNode) {
+                errorDiv.remove();
+            }
+            field.classList.remove('is-invalid');
+        }, 5000);
+    }
+}
+
+// Stock warning functions removed - items are now added automatically without confirmation
+
+function clearValidationErrors() {
+    // Remove all validation error messages
+    const errorAlerts = document.querySelectorAll('.alert-danger');
+    errorAlerts.forEach(alert => alert.remove());
+    
+    // Remove invalid classes from form fields
+    const invalidFields = document.querySelectorAll('.is-invalid');
+    invalidFields.forEach(field => field.classList.remove('is-invalid'));
+}
+
+function showSuccessMessage(message) {
+    const successDiv = document.createElement('div');
+    successDiv.className = 'alert alert-success alert-sm mt-2 fade-in-up';
+    successDiv.innerHTML = `
+        <i class="bi bi-check-circle me-2"></i>
+        ${message}
+    `;
+    
+    // Insert success message after the add product button
+    const addButton = document.querySelector('button[onclick="addProduct()"]');
+    if (addButton) {
+        addButton.parentNode.insertBefore(successDiv, addButton.nextSibling);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            if (successDiv.parentNode) {
+                successDiv.remove();
+            }
+        }, 3000);
+    }
+}
+
+function addProductToOrder(product, quantity) {
     // Check if product already exists in order
-    const existingItem = orderItems.find(item => item.product_id == productId);
+    const existingItem = orderItems.find(item => item.product_id == product.id);
     if (existingItem) {
         existingItem.quantity += quantity;
-        if (existingItem.quantity > product.stock) {
-            // Show warning for total quantity exceeding stock
-            const confirmTotalLowStock = confirm(
-                `Warning: Total quantity (${existingItem.quantity}) now exceeds available stock (${product.stock}).\n\n` +
-                `This will create a backorder. Do you want to continue?`
-            );
-            
-            if (!confirmTotalLowStock) {
-                existingItem.quantity -= quantity; // Revert the addition
-                return;
-            }
-        }
+        // Stock check removed - quantities will be added automatically regardless of stock level
     } else {
         orderItems.push({
-            product_id: parseInt(productId),
+            product_id: parseInt(product.id),
             product_name: product.name,
             quantity: quantity,
             price: product.selling_price,
-            buying_price: product.buyingprice || 0,
+            buying_price: product.buying_price || product.buyingprice || 0,
             negotiated_price: null,
             negotiation_notes: null
         });
     }
     
+    // Debug logging
+    console.log(`Added product to order. Total items now: ${orderItems.length}`);
+    
     updateOrderItemsDisplay();
     updateTotal();
     
-    // Reset form
+    // Reset form and show success message
     document.getElementById('product_select').value = '';
-    document.getElementById('quantity').value = '1';
+    document.getElementById('quantity').value = '';
+    
+    // Show success message
+    showSuccessMessage(`Added ${quantity} unit${quantity > 1 ? 's' : ''} of ${product.name} to order`);
 }
 
 function addManualItem() {
     const itemName = document.getElementById('manual_item_name').value.trim();
-    const quantity = parseInt(document.getElementById('manual_quantity').value);
+    const quantity = parseFloat(document.getElementById('manual_quantity').value);
     const buyingPrice = parseFloat(document.getElementById('manual_buying_price').value) || 0;
     const price = parseFloat(document.getElementById('manual_price').value);
 
@@ -828,8 +1096,8 @@ function addManualItem() {
         return;
     }
 
-    if (!quantity || quantity < 1) {
-        alert('Quantity must be at least 1.');
+    if (!quantity || quantity < 0.01) {
+        alert('Quantity must be at least 0.01.');
         document.getElementById('manual_quantity').focus();
         return;
     }
@@ -867,6 +1135,9 @@ function addManualItem() {
         negotiation_notes: null
     });
 
+    // Debug logging
+    console.log(`Added manual item to order. Total items now: ${orderItems.length}`);
+    
     updateOrderItemsDisplay();
     updateTotal();
     clearManualItemForm();
@@ -910,7 +1181,13 @@ function updateOrderItemsDisplay() {
     const summaryDiv = document.getElementById('orderSummary');
     
     if (orderItems.length === 0) {
-        container.innerHTML = '<p class="text-muted">No items added yet.</p>';
+        container.innerHTML = `
+            <div class="text-center py-5">
+                <i class="bi bi-cart-x text-muted" style="font-size: 3rem;"></i>
+                <h5 class="text-muted mt-3">No items added yet</h5>
+                <p class="text-muted">Start by selecting a branch and adding products to create your order</p>
+            </div>
+        `;
         summaryDiv.style.display = 'none';
         return;
     }
@@ -935,18 +1212,17 @@ function updateOrderItemsDisplay() {
     
     let html = `
         <div class="table-responsive">
-            <table class="table table-striped table-sm">
-                <thead>
+            <table class="table table-hover">
+                <thead class="table-light">
                     <tr>
-                        <th>Product</th>
-                        <th>Qty</th>
-                        <th>Buy Price</th>
-                        <th>Sell Price</th>
-                        <th>Negotiated</th>
-                        <th>Final</th>
-                        <th>Total</th>
-                        <th>Notes</th>
-                        <th>Action</th>
+                        <th><i class="bi bi-box me-1"></i>Product</th>
+                        <th><i class="bi bi-123 me-1"></i>Qty</th>
+                        <th><i class="bi bi-currency-dollar me-1"></i>Cost</th>
+                        <th><i class="bi bi-tag me-1"></i>Price</th>
+                        <th><i class="bi bi-arrow-down-up me-1"></i>Final</th>
+                        <th><i class="bi bi-calculator me-1"></i>Total</th>
+                        <th><i class="bi bi-chat-text me-1"></i>Notes</th>
+                        <th><i class="bi bi-gear me-1"></i>Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -980,41 +1256,77 @@ function updateOrderItemsDisplay() {
         html += `
             <tr class="${rowClass}">
                 <td>
-                    ${item.product_name}
-                    ${isManualItem ? '<span class="badge bg-warning text-dark ms-2">Manual</span>' : ''}
-                    ${isBackorder ? '<span class="badge bg-danger ms-2">Backorder</span>' : ''}
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1">
+                            ${isManualItem ? 
+                                `<input type="text" 
+                                       class="form-control form-control-sm" 
+                                       value="${item.product_name}" 
+                                       onchange="updateProductName(${index}, this.value)"
+                                       placeholder="Enter item name"
+                                       style="min-width: 150px;">` : 
+                                `<div class="fw-semibold">${item.product_name}</div>`
+                            }
+                            ${isBackorder ? `<small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Only ${availableStock.toFixed(2)} in stock</small>` : ''}
+                        </div>
+                        <div class="ms-2">
+                            ${isManualItem ? '<span class="badge bg-warning text-dark"><i class="bi bi-tools me-1"></i>Manual</span>' : ''}
+                            ${isBackorder ? '<span class="badge bg-danger"><i class="bi bi-clock me-1"></i>Backorder</span>' : ''}
+                        </div>
+                    </div>
                 </td>
-                <td class="quantity-cell">
-                    <input type="number" 
-                           class="form-control form-control-sm quantity-input" 
-                           value="${item.quantity}" 
-                           min="1"
-                           data-index="${index}"
-                           onchange="updateQuantity(${index}, this.value)">
-                    ${isBackorder ? `<br><small class="text-danger">(${availableStock} in stock)</small>` : ''}
-                </td>
-                <td>KSh${buyingPrice.toFixed(2)}</td>
-                <td>KSh${item.price.toFixed(2)}</td>
                 <td>
-                    <input type="number" 
-                           class="form-control form-control-sm negotiated-price" 
-                           value="${item.negotiated_price || item.price}" 
-                           step="0.01" 
-                           min="0"
-                           onchange="updateNegotiatedPrice(${index}, this.value)">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity(${index}, ${(item.quantity - 1).toFixed(2)})">
+                            <i class="bi bi-dash"></i>
+                        </button>
+                        <input type="number" 
+                               class="form-control text-center quantity-input" 
+                               value="${item.quantity}" 
+                               min="0.01"
+                               step="0.01"
+                               data-index="${index}"
+                               onchange="updateQuantity(${index}, this.value)"
+                               style="max-width: 70px;">
+                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity(${index}, ${(item.quantity + 1).toFixed(2)})">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                    </div>
                 </td>
-                <td class="final-price">KSh${finalPrice.toFixed(2)}</td>
-                <td class="item-total">KSh${total.toFixed(2)}</td>
+                <td>
+                    <span class="text-muted">KSh${buyingPrice.toFixed(2)}</span>
+                </td>
+                <td>
+                    <span class="fw-semibold">KSh${item.price.toFixed(2)}</span>
+                </td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <input type="number" 
+                               class="form-control negotiated-price" 
+                               value="${item.negotiated_price || item.price}" 
+                               step="0.01" 
+                               min="0"
+                               onchange="updateNegotiatedPrice(${index}, this.value)"
+                               style="max-width: 100px;">
+                    </div>
+                </td>
+                <td>
+                    <span class="fw-bold text-primary">KSh${finalPrice.toFixed(2)}</span>
+                </td>
+                <td>
+                    <span class="fw-bold text-success">KSh${total.toFixed(2)}</span>
+                </td>
                 <td>
                     <input type="text" 
                            class="form-control form-control-sm" 
-                           placeholder="Notes..."
+                           placeholder="Add notes..."
                            value="${item.negotiation_notes || ''}"
-                           onchange="updateNegotiationNotes(${index}, this.value)">
+                           onchange="updateNegotiationNotes(${index}, this.value)"
+                           style="min-width: 120px;">
                 </td>
                 <td>
-                    <button type="button" class="btn btn-danger btn-sm" onclick="removeProduct(${index})">
-                        Remove
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeProduct(${index})" title="Remove item">
+                        <i class="bi bi-trash"></i>
                     </button>
                 </td>
             </tr>
@@ -1039,10 +1351,25 @@ function updateNegotiationNotes(index, notes) {
     orderItems[index].negotiation_notes = notes.trim() || null;
 }
 
+function updateProductName(index, newName) {
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+        alert('Product name cannot be empty.');
+        // Restore the original name
+        const input = event.target;
+        input.value = orderItems[index].product_name;
+        return;
+    }
+    
+    orderItems[index].product_name = trimmedName;
+    updateOrderItemsDisplay();
+    updateTotal();
+}
+
 function updateQuantity(index, newQuantity) {
-    const quantity = parseInt(newQuantity);
-    if (quantity < 1) {
-        alert('Quantity must be at least 1.');
+    const quantity = parseFloat(newQuantity);
+    if (quantity < 0.01) {
+        alert('Quantity must be at least 0.01.');
         return;
     }
 
@@ -1051,17 +1378,7 @@ function updateQuantity(index, newQuantity) {
     // For regular products, check stock availability
     if (item.product_id) {
         const product = products.find(p => p.id === item.product_id);
-        if (product && quantity > product.stock) {
-            // Allow the quantity but show a warning about insufficient stock
-            const confirmLowStock = confirm(
-                `Warning: You're setting quantity to ${quantity} units of ${item.product_name}, but only ${product.stock} are available in stock.\n\n` +
-                `This will create a backorder. Do you want to continue?`
-            );
-            
-            if (!confirmLowStock) {
-                return;
-            }
-        }
+        // Stock check removed - quantities will be updated automatically regardless of stock level
     }
     // For manual items, no stock restrictions
 
@@ -1075,15 +1392,45 @@ function updateTotal() {
         const finalPrice = item.negotiated_price || item.price;
         return sum + (item.quantity * finalPrice);
     }, 0);
+    
+    // Update main total display
     document.getElementById('totalAmount').textContent = total.toFixed(2);
     document.getElementById('orderItemsData').value = JSON.stringify(orderItems);
-    document.getElementById('createOrderBtn').disabled = orderItems.length === 0;
+    
+    // Update create order button state
+    const createOrderBtn = document.getElementById('createOrderBtn');
+    const clearOrderBtn = document.getElementById('clearOrderBtn');
+    const quickStats = document.getElementById('quickStats');
+    
+    // Debug logging
+    console.log(`Order items length: ${orderItems.length}, Button disabled: ${orderItems.length === 0}`);
+    
+    if (createOrderBtn) {
+        createOrderBtn.disabled = orderItems.length === 0;
+    }
+    if (clearOrderBtn) {
+        clearOrderBtn.style.display = orderItems.length > 0 ? 'block' : 'none';
+    }
+    if (quickStats) {
+        quickStats.style.display = orderItems.length > 0 ? 'block' : 'none';
+    }
+    
+    // Update quick stats
+    if (orderItems.length > 0) {
+        document.getElementById('quickTotalItems').textContent = orderItems.length;
+        document.getElementById('quickTotalAmount').textContent = `KSh${total.toFixed(2)}`;
+    }
 
     // Calculate total profit
     const totalProfit = orderItems.reduce((sum, item) => {
-        const buyingPrice = item.buying_price || 0;
-        const sellingPrice = item.negotiated_price || item.price;
-        return sum + (sellingPrice - buyingPrice) * item.quantity;
+        const buyingPrice = parseFloat(item.buying_price) || 0;
+        const sellingPrice = parseFloat(item.negotiated_price) || parseFloat(item.price) || 0;
+        const itemProfit = (sellingPrice - buyingPrice) * parseFloat(item.quantity);
+        
+        // Debug logging
+        console.log(`Item: ${item.product_name}, Buying: ${buyingPrice}, Selling: ${sellingPrice}, Qty: ${item.quantity}, Profit: ${itemProfit}`);
+        
+        return sum + itemProfit;
     }, 0);
     document.getElementById('totalProfit').textContent = `KSh${totalProfit.toFixed(2)}`;
     document.getElementById('totalProfit').classList.remove('profit-positive', 'profit-negative');
@@ -1091,6 +1438,54 @@ function updateTotal() {
         document.getElementById('totalProfit').classList.add('profit-positive');
     } else {
         document.getElementById('totalProfit').classList.add('profit-negative');
+    }
+}
+
+// New functions for improved UX
+function increaseQuantity() {
+    const quantityInput = document.getElementById('quantity');
+    const currentValue = parseFloat(quantityInput.value) || 0;
+    quantityInput.value = (currentValue + 1).toFixed(2);
+}
+
+function decreaseQuantity() {
+    const quantityInput = document.getElementById('quantity');
+    const currentValue = parseFloat(quantityInput.value) || 0;
+    if (currentValue > 0) {
+        quantityInput.value = (currentValue - 1).toFixed(2);
+    }
+}
+
+function clearAllItems() {
+    if (orderItems.length === 0) return;
+    
+    const confirmClear = confirm(`Are you sure you want to remove all ${orderItems.length} items from this order?`);
+    if (confirmClear) {
+        orderItems = [];
+        updateOrderItemsDisplay();
+        updateTotal();
+        
+        // Show success message
+        const successMsg = document.createElement('div');
+        successMsg.className = 'alert alert-success alert-dismissible fade show mt-3';
+        successMsg.innerHTML = `
+            <i class="bi bi-check-circle me-2"></i>
+            All items have been removed from the order.
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // Insert the message after the order items section
+        const orderItemsCard = document.querySelector('.card:has(#orderItems)');
+        if (orderItemsCard) {
+            orderItemsCard.parentNode.insertBefore(successMsg, orderItemsCard.nextSibling);
+        }
+        
+        // Auto-remove message after 3 seconds
+        setTimeout(() => {
+            if (successMsg.parentNode) {
+                successMsg.remove();
+            }
+        }, 3000);
     }
 }
 
