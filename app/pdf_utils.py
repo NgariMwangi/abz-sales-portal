@@ -971,7 +971,7 @@ def create_invoice_pdf_a4(invoice_data, user_data, output_path):
     
     # Invoice Title
     elements.append(Paragraph("INVOICE", title_style))
-    elements.append(Spacer(1, 30))
+    elements.append(Spacer(1, 0))
     
     # Invoice Details
     invoice_details = f"""
@@ -981,7 +981,7 @@ def create_invoice_pdf_a4(invoice_data, user_data, output_path):
     <b>Branch:</b> {invoice_data.get('branch', 'N/A')}<br/>
     """
     elements.append(Paragraph(invoice_details, normal_style))
-    elements.append(Spacer(1, 30))
+    elements.append(Spacer(1, 5))
     
     # Items Table
     if invoice_data.get('order_items'):
