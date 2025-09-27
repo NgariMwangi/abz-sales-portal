@@ -54,7 +54,7 @@
                                 <span class="badge bg-info">{{ receipt.payment_method|title }}</span>
                             </p>
                             <p class="mb-1"><strong>Amount:</strong> 
-                                <span class="text-success fw-bold">KSh{{ "%.2f"|format(receipt.payment_amount) }}</span>
+                                <span class="text-success fw-bold">KSh{{ receipt.payment_amount|format_currency }}</span>
                             </p>
                             {% if receipt.transaction_id %}
                             <p class="mb-1"><strong>Transaction ID:</strong> {{ receipt.transaction_id }}</p>
@@ -92,16 +92,16 @@
                                             Manual Item
                                         {% endif %}
                                     </td>
-                                    <td class="text-center">{{ item.quantity }}</td>
-                                    <td class="text-end">KSh{{ "%.2f"|format(item.final_price) }}</td>
-                                    <td class="text-end">KSh{{ "%.2f"|format(item.quantity * item.final_price) }}</td>
+                                    <td class="text-center">{{ item.quantity|format_quantity }}</td>
+                                    <td class="text-end">KSh{{ item.final_price|format_currency }}</td>
+                                    <td class="text-end">KSh{{ (item.quantity * item.final_price)|format_currency }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                             <tfoot class="table-active">
                                 <tr>
                                     <th colspan="3" class="text-end">Order Total:</th>
-                                    <th class="text-end">KSh{{ "%.2f"|format(receipt.payment_amount) }}</th>
+                                    <th class="text-end">KSh{{ receipt.payment_amount|format_currency }}</th>
                                 </tr>
                             </tfoot>
                         </table>

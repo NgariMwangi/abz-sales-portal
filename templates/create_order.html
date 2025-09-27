@@ -620,6 +620,11 @@ let products = [];
 let searchQuery = '';
 let searchTimeout = null;
 
+// Helper function to format numbers without showing .00 for whole numbers
+function formatNumber(num) {
+    return num % 1 === 0 ? num.toString() : num.toFixed(2);
+}
+
 // Load products when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Add event listeners
@@ -810,11 +815,12 @@ function loadProducts() {
         `;
     }
     
-    // Build API URL
+    // Build API URL with limit for faster loading
     const params = new URLSearchParams();
     if (categoryId) params.append('category_id', categoryId);
     if (branchId) params.append('branch_id', branchId);
     if (searchQuery) params.append('search', searchQuery);
+    // params.append('limit', '100'); // Removed limit to load all products
     
     const url = `/api/products?${params.toString()}`;
     
@@ -822,7 +828,8 @@ function loadProducts() {
     const productSelect = document.getElementById('product_select');
     productSelect.classList.add('loading');
     
-    // Fetch products
+    // Fetch products with performance monitoring
+    const startTime = performance.now();
     fetch(url)
         .then(response => {
             if (!response.ok) {
@@ -838,6 +845,10 @@ function loadProducts() {
             
             products = data || [];
             updateProductSelect();
+            
+            // Log performance
+            const loadTime = performance.now() - startTime;
+            console.log(`Products loaded in ${loadTime.toFixed(2)}ms`);
             
             // Reset clear button state if search was performed
             if (searchQuery) {
@@ -1267,7 +1278,7 @@ function updateOrderItemsDisplay() {
                                        style="min-width: 150px;">` : 
                                 `<div class="fw-semibold">${item.product_name}</div>`
                             }
-                            ${isBackorder ? `<small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Only ${availableStock.toFixed(2)} in stock</small>` : ''}
+                            ${isBackorder ? `<small class="text-danger d-block mt-1"><i class="bi bi-exclamation-triangle me-1"></i>Only ${formatNumber(availableStock)} in stock</small>` : ''}
                         </div>
                         <div class="ms-2">
                             ${isManualItem ? '<span class="badge bg-warning text-dark"><i class="bi bi-tools me-1"></i>Manual</span>' : ''}
@@ -1277,18 +1288,18 @@ function updateOrderItemsDisplay() {
                 </td>
                 <td>
                     <div class="input-group input-group-sm">
-                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity(${index}, ${(item.quantity - 1).toFixed(2)})">
+                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity(${index}, ${formatNumber(item.quantity - 1)})">
                             <i class="bi bi-dash"></i>
                         </button>
                         <input type="number" 
                                class="form-control text-center quantity-input" 
-                               value="${item.quantity}" 
+                               value="${formatNumber(item.quantity)}" 
                                min="0.01"
                                step="0.01"
                                data-index="${index}"
                                onchange="updateQuantity(${index}, this.value)"
                                style="max-width: 70px;">
-                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity(${index}, ${(item.quantity + 1).toFixed(2)})">
+                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity(${index}, ${formatNumber(item.quantity + 1)})">
                             <i class="bi bi-plus"></i>
                         </button>
                     </div>
@@ -1445,14 +1456,14 @@ function updateTotal() {
 function increaseQuantity() {
     const quantityInput = document.getElementById('quantity');
     const currentValue = parseFloat(quantityInput.value) || 0;
-    quantityInput.value = (currentValue + 1).toFixed(2);
+    quantityInput.value = formatNumber(currentValue + 1);
 }
 
 function decreaseQuantity() {
     const quantityInput = document.getElementById('quantity');
     const currentValue = parseFloat(quantityInput.value) || 0;
     if (currentValue > 0) {
-        quantityInput.value = (currentValue - 1).toFixed(2);
+        quantityInput.value = formatNumber(currentValue - 1);
     }
 }
 
@@ -1561,7 +1572,14 @@ document.getElementById('branch_id').addEventListener('change', function() {
     // Update product count message
     document.getElementById('product_count').textContent = 'Please select a branch above to view available products';
     
-    // Load products for the new branch
+    // Load products for the new branch with loading indicator
+    const productCount = document.getElementById('product_count');
+    productCount.innerHTML = `
+        <div class="d-flex align-items-center text-primary">
+            <i class="bi bi-arrow-clockwise spin me-2"></i>
+            <span>Loading products...</span>
+        </div>
+    `;
     loadProducts();
     
     // Refresh the order items display to ensure everything is shown correctly

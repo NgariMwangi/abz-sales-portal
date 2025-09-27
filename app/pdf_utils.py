@@ -9,6 +9,48 @@ from reportlab.lib.colors import black, white
 import os
 from datetime import datetime
 
+def format_currency(amount):
+    """
+    Format currency amount without decimal points unless there's a fractional part
+    """
+    if amount is None:
+        return 'N/A'
+    
+    # Convert to float if it's not already
+    try:
+        amount = float(amount)
+    except (ValueError, TypeError):
+        return 'N/A'
+    
+    # Check if the amount has a fractional part
+    if amount == int(amount):
+        # No decimal part, return without decimal points
+        return f"KSh {int(amount):,}"
+    else:
+        # Has decimal part, return with 2 decimal places
+        return f"KSh {amount:,.2f}"
+
+def format_quantity(quantity):
+    """
+    Format quantity without decimal points unless there's a fractional part
+    """
+    if quantity is None:
+        return '0'
+    
+    # Convert to float if it's not already
+    try:
+        quantity = float(quantity)
+    except (ValueError, TypeError):
+        return str(quantity)
+    
+    # Check if the quantity has a fractional part
+    if quantity == int(quantity):
+        # No decimal part, return without decimal points
+        return str(int(quantity))
+    else:
+        # Has decimal part, return with 2 decimal places
+        return f"{quantity:.2f}"
+
 def create_receipt_pdf(invoice_data, user_data, output_path):
     """
     Create a professional thermal receipt (80mm width)
@@ -187,9 +229,9 @@ def create_receipt_pdf(invoice_data, user_data, output_path):
             
             table_data.append([
                 Paragraph(product_name, product_style),
-                Paragraph(str(quantity), value_style),
-                Paragraph(f"{int(unit_price)}", value_style),
-                Paragraph(f"{int(total)}", value_style)
+                Paragraph(format_quantity(quantity), value_style),
+                Paragraph(format_currency(unit_price).replace('KSh ', ''), value_style),
+                Paragraph(format_currency(total).replace('KSh ', ''), value_style)
             ])
         
         # Create table with optimized widths for 80mm
@@ -218,7 +260,7 @@ def create_receipt_pdf(invoice_data, user_data, output_path):
     story.append(Paragraph("─" * 30, divider_style))
     
     # Total amount - prominent display
-    story.append(Paragraph(f"TOTAL: {int(invoice_data.get('subtotal', 0))}", total_style))
+    story.append(Paragraph(f"TOTAL: {format_currency(invoice_data.get('subtotal', 0))}", total_style))
     
     story.append(Spacer(1, 8))
     
@@ -254,7 +296,7 @@ def generate_invoice_pdf(invoice_id):
     Returns BytesIO object for email attachment
     """
     from io import BytesIO
-    from app.models import Invoice, Order, OrderItem, Product, User, Branch
+    from app.models import Invoice, Order, OrderItem, BranchProduct, User, Branch
     
     # Get invoice and related data
     invoice = Invoice.query.get_or_404(invoice_id)
@@ -279,19 +321,19 @@ def generate_invoice_pdf(invoice_id):
         # Use final_price for calculations (includes negotiated prices)
         if item.final_price is not None:
             final_price = float(item.final_price)
-        elif item.productid and item.product and item.product.sellingprice is not None:
-            final_price = float(item.product.sellingprice)
+        elif item.branch_productid and item.branch_product and item.branch_product.sellingprice is not None:
+            final_price = float(item.branch_product.sellingprice)
         else:
             final_price = 0.0
         
         item_total = item.quantity * final_price
         invoice_data['subtotal'] += item_total
         
-        # Get product name - use product_name field if available, otherwise fall back to product.name
+        # Get product name - use product_name field if available, otherwise fall back to branch_product.catalog_product.name
         if item.product_name:
             product_name = item.product_name
-        elif item.productid and item.product:
-            product_name = item.product.name
+        elif item.branch_productid and item.branch_product:
+            product_name = item.branch_product.catalog_product.name
         else:
             product_name = "Manual Item"
         
@@ -477,11 +519,11 @@ def create_quotation_pdf(quotation, user_data, output_path):
         
         # Add items
         for item in quotation.items:
-            # Get product name - use product_name field if available, otherwise fall back to product.name
+            # Get product name - use product_name field if available, otherwise fall back to branch_product.catalog_product.name
             if hasattr(item, 'product_name') and item.product_name:
                 product_name = item.product_name
-            elif item.product and hasattr(item.product, 'name'):
-                product_name = item.product.name
+            elif item.branch_product and hasattr(item.branch_product, 'catalog_product'):
+                product_name = item.branch_product.catalog_product.name
             else:
                 product_name = 'N/A'
             
@@ -502,9 +544,9 @@ def create_quotation_pdf(quotation, user_data, output_path):
             
             table_data.append([
                 Paragraph(product_name, product_style),
-                Paragraph(str(quantity), value_style),
-                Paragraph(f"{int(unit_price)}", value_style),
-                Paragraph(f"{int(total)}", value_style)
+                Paragraph(format_quantity(quantity), value_style),
+                Paragraph(format_currency(unit_price).replace('KSh ', ''), value_style),
+                Paragraph(format_currency(total).replace('KSh ', ''), value_style)
             ])
         
         # Create table with optimized widths for 80mm
@@ -541,7 +583,7 @@ def create_quotation_pdf(quotation, user_data, output_path):
         spaceAfter=5,
         spaceBefore=5
     )
-    story.append(Paragraph(f"TOTAL: KSh {int(quotation.total_amount)}", total_centered_style))
+    story.append(Paragraph(f"TOTAL: {format_currency(quotation.total_amount)}", total_centered_style))
     
     story.append(Spacer(1, 8))
     
@@ -726,11 +768,11 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
         )
         
         for item in quotation.items:
-            # Get product name - use product_name field if available, otherwise fall back to product.name
+            # Get product name - use product_name field if available, otherwise fall back to branch_product.catalog_product.name
             if hasattr(item, 'product_name') and item.product_name:
                 product_name = item.product_name
-            elif item.product and hasattr(item.product, 'name'):
-                product_name = item.product.name
+            elif item.branch_product and hasattr(item.branch_product, 'catalog_product'):
+                product_name = item.branch_product.catalog_product.name
             else:
                 product_name = 'N/A'
             
@@ -740,9 +782,9 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
             
             data.append([
                 Paragraph((product_name or 'N/A').upper(), product_name_style),
-                str(quantity) if quantity else '0',
-                f"KSh {unit_price:,.2f}" if unit_price else 'N/A',
-                f"KSh {total_price:,.2f}" if total_price else 'N/A'
+                format_quantity(quantity),
+                format_currency(unit_price),
+                format_currency(total_price)
             ])
         
         # Create table with 4 columns
@@ -782,7 +824,7 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
     
     # Total Amount
     if quotation.total_amount:
-        total_data = [['Total Amount:', f"KSh {quotation.total_amount:,.2f}"]]
+        total_data = [['Total Amount:', format_currency(quotation.total_amount)]]
         
         total_table = Table(total_data, colWidths=[2*inch, 2*inch])
         total_table.setStyle(TableStyle([
@@ -967,9 +1009,9 @@ def create_invoice_pdf_a4(invoice_data, user_data, output_path):
             
             data.append([
                 Paragraph((product_name or 'N/A').upper(), product_name_style),
-                str(quantity) if quantity else '0',
-                f"KSh {unit_price:,.2f}" if unit_price else 'N/A',
-                f"KSh {total_price:,.2f}" if total_price else 'N/A'
+                format_quantity(quantity),
+                format_currency(unit_price),
+                format_currency(total_price)
             ])
         
         table = Table(data, colWidths=[3.5*inch, 1*inch, 1.5*inch, 1.5*inch])
@@ -996,7 +1038,7 @@ def create_invoice_pdf_a4(invoice_data, user_data, output_path):
     
     # Total Amount
     if invoice_data.get('subtotal'):
-        total_data = [['Total Amount:', f"KSh {invoice_data['subtotal']:,.2f}"]]
+        total_data = [['Total Amount:', format_currency(invoice_data['subtotal'])]]
         total_table = Table(total_data, colWidths=[2*inch, 2*inch])
         total_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
@@ -1012,10 +1054,23 @@ def create_invoice_pdf_a4(invoice_data, user_data, output_path):
     
     # Payment Methods Section
     elements.append(Paragraph("PAYMENT METHODS", heading_style))
-    payment_methods = """
-    <b>Send Money:</b> 0710460525
-    """
-    elements.append(Paragraph(payment_methods, normal_style))
+    
+    # Paybill method
+    elements.append(Paragraph("<b>Paybill:</b> Business No: 247247, Account No: 483484", normal_style))
+    
+    # Slightly indented OR
+    or_style = ParagraphStyle(
+        'IndentedOR',
+        parent=normal_style,
+        alignment=0,  # Left alignment
+        leftIndent=50,  # Indent 50 points to the right
+        spaceAfter=6,
+        spaceBefore=6
+    )
+    elements.append(Paragraph("<b>OR</b>", or_style))
+    
+    # Send Money method
+    elements.append(Paragraph("<b>Send Money:</b> 0711732341", normal_style))
     elements.append(Spacer(1, 30))
     
     # Footer

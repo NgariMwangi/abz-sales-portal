@@ -24,6 +24,48 @@ app.config.from_object(config[config_name])
 # Initialize app extensions
 init_app(app)
 
+# Add Jinja2 filter for formatting quantities
+@app.template_filter('format_quantity')
+def format_quantity(value):
+    """Format quantity to show decimals only when needed"""
+    try:
+        num = float(value)
+        return f"{num:.2f}" if num % 1 != 0 else f"{int(num)}"
+    except (ValueError, TypeError):
+        return str(value)
+
+# Add Jinja2 filter for formatting currency amounts
+@app.template_filter('format_currency')
+def format_currency(value):
+    """Format currency amounts with commas, without decimal points unless there's a fractional part"""
+    try:
+        num = float(value)
+        # Check if the amount has a fractional part
+        if num == int(num):
+            # No decimal part, return without decimal points
+            return f"{int(num):,}"
+        else:
+            # Has decimal part, return with 2 decimal places
+            return f"{num:,.2f}"
+    except (ValueError, TypeError):
+        return str(value)
+
+# Add Jinja2 filter for formatting quantities
+@app.template_filter('format_quantity')
+def format_quantity(value):
+    """Format quantities without decimal points unless there's a fractional part"""
+    try:
+        num = float(value)
+        # Check if the quantity has a fractional part
+        if num == int(num):
+            # No decimal part, return without decimal points
+            return str(int(num))
+        else:
+            # Has decimal part, return with 2 decimal places
+            return f"{num:.2f}"
+    except (ValueError, TypeError):
+        return str(value)
+
 with app.app_context():
     db.create_all()
     print("✅ All tables created successfully in PostgreSQL.")
@@ -76,8 +118,8 @@ def dashboard():
             for item in order.order_items:
                 if item.final_price is not None:
                     total_revenue += float(item.quantity) * float(item.final_price)
-                elif item.product.sellingprice is not None:
-                    total_revenue += float(item.quantity) * float(item.product.sellingprice)
+                elif item.branch_product and item.branch_product.sellingprice is not None:
+                    total_revenue += float(item.quantity) * float(item.branch_product.sellingprice)
     
     stats = {
         'total_orders': len(walk_in_orders),
@@ -95,8 +137,8 @@ def dashboard():
         for item in order.order_items:
             if item.final_price is not None:
                 total_amount += float(item.quantity) * float(item.final_price)
-            elif item.product.sellingprice is not None:
-                total_amount += float(item.quantity) * float(item.product.sellingprice)
+            elif item.branch_product and item.branch_product.sellingprice is not None:
+                total_amount += float(item.quantity) * float(item.branch_product.sellingprice)
         
         recent_orders_data.append({
             'id': order.id,
@@ -161,16 +203,16 @@ def orders_page():
             # Get product name - use product_name field if available, otherwise fall back to product.name
             if item.product_name:
                 product_name = item.product_name
-            elif item.productid and item.product:
-                product_name = item.product.name
+            elif item.branch_productid and item.branch_product:
+                product_name = item.branch_product.catalog_product.name
             else:
                 product_name = "Manual Item"
             
             # Get product price - use original_price if available, otherwise fall back to product.sellingprice
             if item.original_price is not None:
                 product_price = item.original_price
-            elif item.productid and item.product and item.product.sellingprice is not None:
-                product_price = item.product.sellingprice
+            elif item.branch_productid and item.branch_product and item.branch_product.sellingprice is not None:
+                product_price = item.branch_product.sellingprice
             else:
                 product_price = 0.0
             
@@ -231,8 +273,8 @@ def order_detail(order_id):
         # Use final_price for calculations (includes negotiated prices)
         if item.final_price is not None:
             final_price = float(item.final_price)
-        elif item.product.sellingprice is not None:
-            final_price = float(item.product.sellingprice)
+        elif item.branch_product and item.branch_product.sellingprice is not None:
+            final_price = float(item.branch_product.sellingprice)
         else:
             final_price = 0.0  # Fallback to zero if no price available
         item_total = float(item.quantity) * final_price
@@ -241,24 +283,24 @@ def order_detail(order_id):
         # Handle original price
         if item.original_price is not None:
             original_price = float(item.original_price)
-        elif item.product.sellingprice is not None:
-            original_price = float(item.product.sellingprice)
+        elif item.branch_product and item.branch_product.sellingprice is not None:
+            original_price = float(item.branch_product.sellingprice)
         else:
             original_price = 0.0
         
         # Handle final price for display
         if item.final_price is not None:
             display_final_price = float(item.final_price)
-        elif item.productid and item.product and item.product.sellingprice is not None:
-            display_final_price = float(item.product.sellingprice)
+        elif item.branch_productid and item.branch_product and item.branch_product.sellingprice is not None:
+            display_final_price = float(item.branch_product.sellingprice)
         else:
             display_final_price = 0.0
         
         # Get product name - use product_name field if available, otherwise fall back to product.name
         if item.product_name:
             product_name = item.product_name
-        elif item.productid and item.product:
-            product_name = item.product.name
+        elif item.branch_productid and item.branch_product:
+            product_name = item.branch_product.catalog_product.name
         else:
             product_name = "Manual Item"
         
@@ -313,8 +355,8 @@ def view_order_invoice(order_id):
         # Use final_price for calculations (includes negotiated prices)
         if item.final_price is not None:
             final_price = float(item.final_price)
-        elif item.productid and item.product and item.product.sellingprice is not None:
-            final_price = float(item.product.sellingprice)
+        elif item.branch_productid and item.branch_product and item.branch_product.sellingprice is not None:
+            final_price = float(item.branch_product.sellingprice)
         else:
             final_price = 0.0
         
@@ -324,8 +366,8 @@ def view_order_invoice(order_id):
         # Get product name - use product_name field if available, otherwise fall back to product.name
         if item.product_name:
             product_name = item.product_name
-        elif item.productid and item.product:
-            product_name = item.product.name
+        elif item.branch_productid and item.branch_product:
+            product_name = item.branch_product.catalog_product.name
         else:
             product_name = "Manual Item"
         
@@ -409,8 +451,8 @@ def view_order_invoice_browser(order_id):
             final_price = float(item.final_price)
         elif item.original_price is not None:
             final_price = float(item.original_price)
-        elif item.product and item.product.sellingprice is not None:
-            final_price = float(item.product.sellingprice)
+        elif item.branch_product and item.branch_product.sellingprice is not None:
+            final_price = float(item.branch_product.sellingprice)
         else:
             final_price = 0.0
         
@@ -418,7 +460,7 @@ def view_order_invoice_browser(order_id):
         invoice_data['subtotal'] += item_total
         
         invoice_data['order_items'].append({
-            'product_name': item.product_name if item.product_name else (item.product.name if item.product else 'Manual Item'),
+            'product_name': item.product_name if item.product_name else (item.branch_product.catalog_product.name if item.branch_product else 'Manual Item'),
             'quantity': item.quantity,
             'unit_price': final_price,
             'total': item_total
@@ -521,7 +563,8 @@ def create_order():
         return redirect(url_for('orders_page'))
     
     branches = Branch.query.all()
-    products = Product.query.filter_by(display=True).all()
+    from app.models import BranchProduct, ProductCatalog
+    products = BranchProduct.query.join(ProductCatalog).filter(BranchProduct.display == True).all()
     subcategories = SubCategory.query.all()
     
     return render_template('create_order.html',
@@ -602,16 +645,16 @@ def edit_order(order_id):
         # Get product name - use product_name field if available, otherwise fall back to product.name
         if item.product_name:
             product_name = item.product_name
-        elif item.productid and item.product:
-            product_name = item.product.name
+        elif item.branch_productid and item.branch_product:
+            product_name = item.branch_product.catalog_product.name
         else:
             product_name = "Manual Item"
         
         # Get product price - use original_price if available, otherwise fall back to product.sellingprice
         if item.original_price is not None:
             product_price = item.original_price
-        elif item.productid and item.product and item.product.sellingprice is not None:
-            product_price = item.product.sellingprice
+        elif item.branch_productid and item.branch_product and item.branch_product.sellingprice is not None:
+            product_price = item.branch_product.sellingprice
         else:
             product_price = 0.0
         
@@ -627,7 +670,8 @@ def edit_order(order_id):
         })
     
     branches = Branch.query.all()
-    products = Product.query.filter_by(display=True).all()
+    from app.models import BranchProduct, ProductCatalog
+    products = BranchProduct.query.join(ProductCatalog).filter(BranchProduct.display == True).all()
     subcategories = SubCategory.query.all()
     
     return render_template('edit_order.html',
@@ -702,33 +746,47 @@ def products_page():
     branch = request.args.get('branch', '')
     search = request.args.get('search', '')
     
-    query = Product.query
+    from app.models import BranchProduct, ProductCatalog, SubCategory, Category
+    query = BranchProduct.query.join(ProductCatalog)
     
     if category:
         query = query.join(SubCategory).join(Category).filter(Category.name == category)
     if branch:
         query = query.join(Branch).filter(Branch.name == branch)
     if search:
-        query = query.filter(Product.name.ilike(f'%{search}%'))
+        from sqlalchemy import or_
+        # More flexible search across multiple columns
+        search_filter = or_(
+            ProductCatalog.name.ilike(f'%{search}%'),
+            ProductCatalog.productcode.ilike(f'%{search}%'),
+            BranchProduct.buyingprice.cast(db.String).ilike(f'%{search}%'),
+            BranchProduct.sellingprice.cast(db.String).ilike(f'%{search}%'),
+            BranchProduct.stock.cast(db.String).ilike(f'%{search}%')
+        )
+        query = query.filter(search_filter)
     
     products = query.paginate(page=page, per_page=20, error_out=False)
     
     products_data = []
-    for product in products.items:
-        # Get category name through subcategory relationship
-        category_name = product.sub_category.category.name if product.sub_category and product.sub_category.category else 'Uncategorized'
+    for branch_product in products.items:
+        # Get category name through catalog -> subcategory -> category relationship
+        category_name = 'Uncategorized'
+        if branch_product.catalog_product.subcategory_id:
+            subcategory = SubCategory.query.get(branch_product.catalog_product.subcategory_id)
+            if subcategory and subcategory.category:
+                category_name = subcategory.category.name
         
         products_data.append({
-            'id': product.id,
-            'name': product.name,
+            'id': branch_product.id,
+            'name': branch_product.catalog_product.name,
             'category': category_name,
-            'branch': product.branch.name,
-            'buying_price': product.buyingprice,
-            'selling_price': product.sellingprice,
-            'stock': product.stock,
-            'product_code': product.productcode,
-            'display': product.display,
-            'image_url': product.image_url
+            'branch': branch_product.branch.name,
+            'buying_price': branch_product.buyingprice,
+            'selling_price': branch_product.sellingprice,
+            'stock': branch_product.stock,
+            'product_code': branch_product.catalog_product.productcode,
+            'display': branch_product.display,
+            'image_url': branch_product.catalog_product.image_url
         })
     
     # Get filter options
@@ -758,14 +816,24 @@ def export_products():
     search = request.args.get('search', '')
     
     # Build query with same filters as products page
-    query = Product.query
+    from app.models import BranchProduct, ProductCatalog
+    query = BranchProduct.query.join(ProductCatalog)
     
     if category:
         query = query.join(SubCategory).join(Category).filter(Category.name == category)
     if branch:
         query = query.join(Branch).filter(Branch.name == branch)
     if search:
-        query = query.filter(Product.name.ilike(f'%{search}%'))
+        from sqlalchemy import or_
+        # More flexible search across multiple columns
+        search_filter = or_(
+            ProductCatalog.name.ilike(f'%{search}%'),
+            ProductCatalog.productcode.ilike(f'%{search}%'),
+            BranchProduct.buyingprice.cast(db.String).ilike(f'%{search}%'),
+            BranchProduct.sellingprice.cast(db.String).ilike(f'%{search}%'),
+            BranchProduct.stock.cast(db.String).ilike(f'%{search}%')
+        )
+        query = query.filter(search_filter)
     
     # Get all products (no pagination for export)
     products = query.all()
@@ -778,19 +846,24 @@ def export_products():
     writer.writerow(['ID', 'Name', 'Product Code', 'Category', 'Branch', 'Buying Price', 'Selling Price', 'Stock', 'Status'])
     
     # Write data rows
-    for product in products:
-        category_name = product.sub_category.category.name if product.sub_category and product.sub_category.category else 'Uncategorized'
-        status = 'Active' if product.display else 'Hidden'
+    for branch_product in products:
+        category_name = 'Uncategorized'
+        if branch_product.catalog_product.subcategory_id:
+            from app.models import SubCategory, Category
+            subcategory = SubCategory.query.get(branch_product.catalog_product.subcategory_id)
+            if subcategory and subcategory.category:
+                category_name = subcategory.category.name
+        status = 'Active' if branch_product.display else 'Hidden'
         
         writer.writerow([
-            product.id,
-            product.name,
-            product.productcode or '',
+            branch_product.id,
+            branch_product.catalog_product.name,
+            branch_product.catalog_product.productcode or '',
             category_name,
-            product.branch.name,
-            product.buyingprice or 0,
-            product.sellingprice or 0,
-            product.stock or 0,
+            branch_product.branch.name,
+            branch_product.buyingprice or 0,
+            branch_product.sellingprice or 0,
+            branch_product.stock or 0,
             status
         ])
     
@@ -828,19 +901,24 @@ def export_products():
 @app.route("/products/<int:product_id>/edit", methods=['GET', 'POST'])
 @login_required
 def edit_product(product_id):
-    product = Product.query.get_or_404(product_id)
+    from app.models import BranchProduct
+    branch_product = BranchProduct.query.get_or_404(product_id)
     
     if request.method == 'POST':
         try:
-            product.name = request.form['name']
-            product.subcategory_id = int(request.form['category_id'])
-            product.branchid = int(request.form['branch_id'])
-            product.buyingprice = int(request.form['buying_price'])
-            product.sellingprice = int(request.form['selling_price'])
-            product.stock = int(request.form['stock'])
-            product.productcode = request.form['product_code']
-            product.display = 'display' in request.form
-            product.updated_at = datetime.utcnow()
+            from app.models import ProductCatalog
+            # Update catalog product
+            branch_product.catalog_product.name = request.form['name']
+            branch_product.catalog_product.subcategory_id = int(request.form['category_id'])
+            branch_product.catalog_product.productcode = request.form['product_code']
+            
+            # Update branch product
+            branch_product.branchid = int(request.form['branch_id'])
+            branch_product.buyingprice = float(request.form['buying_price'])
+            branch_product.sellingprice = float(request.form['selling_price'])
+            branch_product.stock = float(request.form['stock'])
+            branch_product.display = 'display' in request.form
+            branch_product.updated_at = datetime.utcnow()
             
             db.session.commit()
             flash('Product updated successfully!', 'success')
@@ -854,7 +932,7 @@ def edit_product(product_id):
     
     return render_template('edit_product.html',
                          user=current_user,
-                         product=product,
+                         product=branch_product,
                          subcategories=subcategories,
                          branches=branches)
 
@@ -865,16 +943,48 @@ def stock_page():
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '')
     
-    query = Product.query
+    from app.models import BranchProduct, ProductCatalog, SubCategory, Category
+    query = BranchProduct.query.join(ProductCatalog)
     
     if search:
-        query = query.filter(Product.name.ilike(f'%{search}%'))
+        from sqlalchemy import or_
+        # More flexible search across multiple columns
+        search_filter = or_(
+            ProductCatalog.name.ilike(f'%{search}%'),
+            ProductCatalog.productcode.ilike(f'%{search}%'),
+            BranchProduct.buyingprice.cast(db.String).ilike(f'%{search}%'),
+            BranchProduct.sellingprice.cast(db.String).ilike(f'%{search}%'),
+            BranchProduct.stock.cast(db.String).ilike(f'%{search}%')
+        )
+        query = query.filter(search_filter)
     
     products = query.paginate(page=page, per_page=20, error_out=False)
     
+    # Process products data to match template expectations
+    products_data = []
+    for branch_product in products.items:
+        # Get category name through catalog -> subcategory -> category relationship
+        category_name = 'Uncategorized'
+        if branch_product.catalog_product.subcategory_id:
+            subcategory = SubCategory.query.get(branch_product.catalog_product.subcategory_id)
+            if subcategory and subcategory.category:
+                category_name = subcategory.category.name
+        
+        products_data.append({
+            'id': branch_product.id,
+            'name': branch_product.catalog_product.name,
+            'productcode': branch_product.catalog_product.productcode,
+            'stock': branch_product.stock,
+            'sub_category': {
+                'category': {
+                    'name': category_name
+                }
+            }
+        })
+    
     return render_template('stock.html', 
                          user=current_user, 
-                         products=products.items,
+                         products=products_data,
                          pagination=products,
                          current_search=search)
 
@@ -954,42 +1064,65 @@ def api_products():
         category_id = request.args.get('category_id', type=int)
         branch_id = request.args.get('branch_id', type=int)
         search = request.args.get('search', '').strip()
+        # Cache key for simple request caching
+        cache_key = f"products_{branch_id}_{category_id}_{search}"
     
-        # Start with base query
-        query = Product.query.filter_by(display=True)
+        # Start with base query - optimized for performance
+        from app.models import BranchProduct, ProductCatalog
+        from sqlalchemy import and_
+        
+        # Use a more efficient query structure
+        query = db.session.query(
+            BranchProduct.id,
+            BranchProduct.buyingprice,
+            BranchProduct.sellingprice,
+            BranchProduct.stock,
+            ProductCatalog.name,
+            ProductCatalog.productcode
+        ).select_from(BranchProduct).join(
+            ProductCatalog, BranchProduct.catalog_id == ProductCatalog.id
+        ).filter(
+            and_(
+                BranchProduct.display == True,
+                BranchProduct.branchid == branch_id
+            )
+        )
     
-        # Apply filters
+        # Apply additional filters
         if category_id:
-            query = query.filter_by(subcategory_id=category_id)
-        if branch_id:
-            query = query.filter_by(branchid=branch_id)
+            # Filter by category through ProductCatalog -> SubCategory -> Category
+            from app.models import SubCategory
+            from sqlalchemy import select
+            subcategory_ids = select(SubCategory.id).where(SubCategory.category_id == category_id)
+            catalog_ids = select(ProductCatalog.id).where(ProductCatalog.subcategory_id.in_(subcategory_ids))
+            query = query.filter(BranchProduct.catalog_id.in_(catalog_ids))
     
         # Apply search if provided
         if search:
             from sqlalchemy import or_
             # More flexible search across multiple columns
             search_filter = or_(
-                Product.name.ilike(f'%{search}%'),
-                Product.productcode.ilike(f'%{search}%'),
-                Product.buyingprice.cast(db.String).ilike(f'%{search}%'),
-                Product.sellingprice.cast(db.String).ilike(f'%{search}%'),
-                Product.stock.cast(db.String).ilike(f'%{search}%')
+                ProductCatalog.name.ilike(f'%{search}%'),
+                ProductCatalog.productcode.ilike(f'%{search}%'),
+                BranchProduct.buyingprice.cast(db.String).ilike(f'%{search}%'),
+                BranchProduct.sellingprice.cast(db.String).ilike(f'%{search}%'),
+                BranchProduct.stock.cast(db.String).ilike(f'%{search}%')
             )
             query = query.filter(search_filter)
         
-        # Execute query
-        products = query.all()
+        # Execute query with ordering
+        products = query.order_by(ProductCatalog.name.asc()).all()
     
-        # Convert to JSON-serializable format
+        # Convert to JSON-serializable format (optimized for selected fields)
         result = []
-        for p in products:
+        for product in products:
             result.append({
-                'id': p.id,
-                'name': p.name or '',
-                'selling_price': float(p.sellingprice) if p.sellingprice else 0.0,
-                'buyingprice': float(p.buyingprice) if p.buyingprice else 0.0,
-                'stock': float(p.stock) if p.stock else 0.0,
-                'product_code': p.productcode or ''
+                'id': product.id,
+                'name': product.name or '',
+                'selling_price': float(product.sellingprice) if product.sellingprice else 0.0,
+                'buyingprice': float(product.buyingprice) if product.buyingprice else 0.0,
+                'stock': float(product.stock) if product.stock else 0.0,
+                'product_code': product.productcode or ''
             })
         
         return jsonify(result)
@@ -1118,7 +1251,8 @@ def create_quotation():
     
     # GET request - show form
     branches = Branch.query.all()
-    products = Product.query.filter_by(display=True).all()
+    from app.models import BranchProduct, ProductCatalog
+    products = BranchProduct.query.join(ProductCatalog).filter(BranchProduct.display == True).all()
     subcategories = SubCategory.query.all()
     
     return render_template('create_quotation.html',
@@ -1394,7 +1528,8 @@ def edit_quotation(quotation_id):
     
     # GET request - show edit form
     branches = Branch.query.all()
-    products = Product.query.filter_by(display=True).all()
+    from app.models import BranchProduct, ProductCatalog
+    products = BranchProduct.query.join(ProductCatalog).options(db.joinedload(BranchProduct.catalog_product)).filter(BranchProduct.display == True).all()
     subcategories = SubCategory.query.all()
     
     return render_template('edit_quotation.html',
@@ -1500,8 +1635,8 @@ def negotiate_order_prices(order_id):
         # Handle None values for price fields
         if item.original_price is not None:
             original_price = float(item.original_price)
-        elif item.productid and item.product and item.product.sellingprice is not None:
-            original_price = float(item.product.sellingprice)
+        elif item.branch_productid and item.branch_product and item.branch_product.sellingprice is not None:
+            original_price = float(item.branch_product.sellingprice)
         else:
             original_price = 0.0
         
@@ -1515,8 +1650,8 @@ def negotiate_order_prices(order_id):
         # Get product name - use product_name field if available, otherwise fall back to product.name
         if item.product_name:
             product_name = item.product_name
-        elif item.productid and item.product:
-            product_name = item.product.name
+        elif item.branch_productid and item.branch_product:
+            product_name = item.branch_product.catalog_product.name
         else:
             product_name = "Manual Item"
         

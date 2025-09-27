@@ -73,7 +73,7 @@
                                 {% endif %}
                             </td>
                             <td>{{ quotation.branch.name }}</td>
-                            <td>KSh{{ "%.2f"|format(quotation.total_amount) }}</td>
+                            <td>KSh{{ quotation.total_amount|format_currency }}</td>
                             <td>
                                 <span class="badge 
                                     {% if quotation.status == 'pending' %}bg-warning

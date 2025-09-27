@@ -10,7 +10,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from main import app
-from app.models import Order, OrderItem, Product, Branch, OrderType, User, StockTransaction
+from app.models import Order, OrderItem, BranchProduct, Branch, OrderType, User, StockTransaction
 from app import db
 
 def test_branch_selection():

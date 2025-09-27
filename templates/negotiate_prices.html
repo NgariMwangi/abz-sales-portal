@@ -72,20 +72,20 @@
                                         {% for item in order_items %}
                                         <tr>
                                             <td>{{ item.product_name }}</td>
-                                            <td>{{ item.quantity }}</td>
-                                            <td>KSh{{ "%.2f"|format(item.original_price) }}</td>
+                                            <td>{{ item.quantity|format_quantity }}</td>
+                                            <td>KSh{{ item.original_price|format_currency }}</td>
                                             <td>
                                                 <input type="number" 
                                                        class="form-control negotiated-price" 
                                                        name="negotiated_price_{{ item.id }}"
-                                                       value="{{ "%.2f"|format(item.negotiated_price) if item.negotiated_price else "%.2f"|format(item.original_price) }}"
+                                                       value="{{ item.negotiated_price|format_currency if item.negotiated_price else item.original_price|format_currency }}"
                                                        step="0.01" 
                                                        min="0"
                                                        data-original-price="{{ item.original_price }}"
                                                        data-item-id="{{ item.id }}">
                                             </td>
-                                            <td class="final-price">KSh{{ "%.2f"|format(item.final_price) }}</td>
-                                            <td class="item-total">KSh{{ "%.2f"|format(item.total) }}</td>
+                                            <td class="final-price">KSh{{ item.final_price|format_currency }}</td>
+                                            <td class="item-total">KSh{{ item.total|format_currency }}</td>
                                             <td>
                                                 <input type="text" 
                                                        class="form-control" 
@@ -99,7 +99,7 @@
                                     <tfoot class="table-light">
                                         <tr>
                                             <td colspan="5" class="text-end"><strong>Order Total:</strong></td>
-                                            <td><strong id="orderTotal">KSh{{ "%.2f"|format(order_items|sum(attribute='total')) }}</strong></td>
+                                            <td><strong id="orderTotal">KSh{{ (order_items|sum(attribute='total'))|format_currency }}</strong></td>
                                             <td></td>
                                         </tr>
                                     </tfoot>

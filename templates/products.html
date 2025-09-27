@@ -91,7 +91,7 @@
                                 {% else %}
                                     bg-secondary
                                 {% endif %}">
-                                {{ product.stock if product.stock is not none else "0" }}
+                                {{ (product.stock|format_quantity) if product.stock is not none else "0" }}
                             </span>
                         </td>
                         

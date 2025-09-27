@@ -46,7 +46,7 @@
                     <h5 class="mb-0">Order Summary</h5>
                 </div>
                 <div class="card-body">
-                    <h3 class="text-primary">Total: KSh{{ "%.2f"|format(order.total_amount) }}</h3>
+                    <h3 class="text-primary">Total: KSh{{ order.total_amount|format_currency }}</h3>
                     <p class="text-muted">{{ order.order_items|length }} items</p>
                 </div>
             </div>
@@ -79,20 +79,20 @@
                                     <td>
                                         <strong>{{ item.product_name }}</strong>
                                         {% if item.quantity > 1 %}
-                                            <br><small class="text-muted d-md-none">Qty: {{ item.quantity }}</small>
+                                            <br><small class="text-muted d-md-none">Qty: {{ item.quantity|format_quantity }}</small>
                                         {% endif %}
                                     </td>
-                                    <td class="d-none d-md-table-cell">{{ item.quantity }}</td>
-                                    <td class="d-none d-lg-table-cell">KSh{{ "%.2f"|format(item.original_price) }}</td>
+                                    <td class="d-none d-md-table-cell">{{ item.quantity|format_quantity }}</td>
+                                    <td class="d-none d-lg-table-cell">KSh{{ item.original_price|format_currency }}</td>
                                     <td class="d-none d-lg-table-cell">
                                         {% if item.negotiated_price %}
-                                            KSh{{ "%.2f"|format(item.negotiated_price) }}
+                                            KSh{{ item.negotiated_price|format_currency }}
                                         {% else %}
                                             <span class="text-muted">-</span>
                                         {% endif %}
                                     </td>
-                                    <td class="d-none d-md-table-cell">KSh{{ "%.2f"|format(item.final_price) }}</td>
-                                    <td class="d-none d-md-table-cell">KSh{{ "%.2f"|format(item.total) }}</td>
+                                    <td class="d-none d-md-table-cell">KSh{{ item.final_price|format_currency }}</td>
+                                    <td class="d-none d-md-table-cell">KSh{{ item.total|format_currency }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

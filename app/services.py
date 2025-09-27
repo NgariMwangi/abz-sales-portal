@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash
 from app import db
-from app.models import Order, Payment, Invoice, Receipt, StockTransaction, PasswordReset, User, Product, OrderItem, OrderType
+from app.models import Order, Payment, Invoice, Receipt, StockTransaction, PasswordReset, User, OrderItem, OrderType, BranchProduct
 from app.utils import create_invoice_for_order, create_receipt_for_payment
 from app.pdf_utils import generate_invoice_pdf
 from email_service import get_email_service
@@ -25,36 +25,36 @@ class OrderService:
                 
                 # Validate that all items have branch selections
                 for item in order.order_items:
-                    if not item.productid or not item.product:
+                    if not item.branch_productid or not item.branch_product:
                         return False, f"Branch selection required for manual item: {item.product_name or 'Unknown'}"
                     if str(item.id) not in item_branch_selections:
-                        return False, f"Branch selection required for {item.product.name if item.product else 'Unknown Product'}"
+                        return False, f"Branch selection required for {item.branch_product.catalog_product.name if item.branch_product else 'Unknown Product'}"
             
             # Update stock for each item
             for item in order.order_items:
                 # Skip stock updates for manual items (they don't have products to update stock for)
-                if not item.productid or not item.product:
+                if not item.branch_productid or not item.branch_product:
                     continue
                     
                 if 'online' in order.ordertype.name.lower() and item_branch_selections:
                     # For online orders, reduce stock from the selected branch for this item
                     selected_branch_id = item_branch_selections.get(str(item.id))
                     if not selected_branch_id:
-                        return False, f'Branch selection required for {item.product.name}'
+                        return False, f'Branch selection required for {item.branch_product.catalog_product.name}'
                     
                     # Find the product in the selected branch
-                    product_in_branch = Product.query.filter_by(
-                        productcode=item.product.productcode,
+                    product_in_branch = BranchProduct.query.filter_by(
+                        catalog_id=item.branch_product.catalog_id,
                         branchid=selected_branch_id
                     ).first()
                     
                     if not product_in_branch:
-                        return False, f"Product {item.product.name if item.product else 'Unknown'} not available in selected branch"
+                        return False, f"Product {item.branch_product.catalog_product.name if item.branch_product else 'Unknown'} not available in selected branch"
                     
                     # Check stock availability (allow zero stock sales with warning)
                     if product_in_branch.stock < item.quantity:
                         # Allow the order but log a warning about insufficient stock
-                        print(f"Warning: Ordering {item.quantity} units of {item.product.name if item.product else 'Unknown'} from branch {product_in_branch.branch.name} but only {product_in_branch.stock} available in stock")
+                        print(f"Warning: Ordering {item.quantity} units of {item.branch_product.catalog_product.name if item.branch_product else 'Unknown'} from branch {product_in_branch.branch.name} but only {product_in_branch.stock} available in stock")
                         # You could also add this to a warnings log or notification system
                     
                     # Update stock from the selected branch
@@ -64,7 +64,7 @@ class OrderService:
                     
                     # Log if stock goes negative (backorder situation)
                     if new_stock < 0:
-                        print(f"Warning: Product {item.product.name if item.product else 'Unknown'} stock in branch {product_in_branch.branch.name} is now negative ({new_stock}) after order approval")
+                        print(f"Warning: Product {item.branch_product.catalog_product.name if item.branch_product else 'Unknown'} stock in branch {product_in_branch.branch.name} is now negative ({new_stock}) after order approval")
                     
                     # Create stock transaction record for the selected branch product
                     stock_transaction = StockTransaction(
@@ -74,24 +74,24 @@ class OrderService:
                         quantity=item.quantity,
                         previous_stock=previous_stock,
                         new_stock=new_stock,
-                        notes=f"Order #{order.id} approved - {item.product.name if item.product else 'Unknown'} fulfilled from branch {product_in_branch.branch.name}" + (' (backorder)' if new_stock < 0 else '')
+                        notes=f"Order #{order.id} approved - {item.branch_product.catalog_product.name if item.branch_product else 'Unknown'} fulfilled from branch {product_in_branch.branch.name}" + (' (backorder)' if new_stock < 0 else '')
                     )
                     db.session.add(stock_transaction)
                 else:
                     # For non-online orders, reduce stock from the original product
-                    product = item.product
-                    previous_stock = product.stock
-                    product.stock -= item.quantity
-                    new_stock = product.stock
+                    branch_product = item.branch_product
+                    previous_stock = branch_product.stock
+                    branch_product.stock -= item.quantity
+                    new_stock = branch_product.stock
                     
                     # Log if stock goes negative (backorder situation)
                     if new_stock < 0:
-                        print(f"Warning: Product {product.name} stock is now negative ({new_stock}) after order approval")
+                        print(f"Warning: Product {branch_product.catalog_product.name} stock is now negative ({new_stock}) after order approval")
                         # You could add this to a backorder tracking system
                     
                     # Create stock transaction record
                     stock_transaction = StockTransaction(
-                        productid=product.id,
+                        productid=branch_product.id,
                         userid=current_user.id,
                         transaction_type='remove',
                         quantity=item.quantity,
@@ -186,23 +186,23 @@ class OrderService:
                 # Check if this is a manual item (no product_id) or regular product
                 if item_data.get('product_id'):
                     # Regular product - get product details from database
-                    product = Product.query.get_or_404(int(item_data['product_id']))
-                    product_name = product.name
+                    branch_product = BranchProduct.query.get_or_404(int(item_data['product_id']))
+                    product_name = branch_product.catalog_product.name
                     
                     # For walk-in orders, use selling price as original price (what customer pays)
                     # For online orders, use selling price as original price
                     if is_walk_in:
-                        if product.sellingprice is not None and product.sellingprice > 0:
-                            original_price = float(product.sellingprice)
-                        elif product.buyingprice is not None and product.buyingprice > 0:
-                            original_price = float(product.buyingprice)
+                        if branch_product.sellingprice is not None and branch_product.sellingprice > 0:
+                            original_price = float(branch_product.sellingprice)
+                        elif branch_product.buyingprice is not None and branch_product.buyingprice > 0:
+                            original_price = float(branch_product.buyingprice)
                         else:
-                            raise ValueError(f'Product {product.name} has no valid price (selling or buying price is missing or zero)')
+                            raise ValueError(f'Product {branch_product.catalog_product.name} has no valid price (selling or buying price is missing or zero)')
                     else:
-                        if product.sellingprice is not None and product.sellingprice > 0:
-                            original_price = float(product.sellingprice)
+                        if branch_product.sellingprice is not None and branch_product.sellingprice > 0:
+                            original_price = float(branch_product.sellingprice)
                         else:
-                            raise ValueError(f'Product {product.name} has no valid selling price')
+                            raise ValueError(f'Product {branch_product.catalog_product.name} has no valid selling price')
                     
                     # Handle negotiated price if provided
                     negotiated_price_raw = item_data.get('negotiated_price')
@@ -215,10 +215,10 @@ class OrderService:
                     
                     order_item = OrderItem(
                         orderid=order.id,
-                        productid=product.id,
-                        product_name=product.name,  # Use product name from database
+                        branch_productid=branch_product.id,
+                        product_name=branch_product.catalog_product.name,  # Use product name from database
                         quantity=quantity,
-                        buying_price=float(product.buyingprice) if product.buyingprice is not None and product.buyingprice > 0 else None,
+                        buying_price=float(branch_product.buyingprice) if branch_product.buyingprice is not None and branch_product.buyingprice > 0 else None,
                         original_price=original_price,
                         negotiated_price=negotiated_price if negotiated_price != original_price else None,
                         final_price=final_price,
@@ -258,7 +258,7 @@ class OrderService:
                     
                     order_item = OrderItem(
                         orderid=order.id,
-                        productid=None,  # Manual items have no product ID
+                        branch_productid=None,  # Manual items have no product ID
                         product_name=product_name,  # Use product name from item data
                         quantity=quantity,
                         buying_price=buying_price,
@@ -321,27 +321,27 @@ class OrderService:
                 # Check if this is a manual item (no product_id) or regular product
                 if item_data.get('product_id'):
                     # Regular product - get product details from database
-                    product = Product.query.get_or_404(int(item_data['product_id']))
-                    product_name = product.name
+                    branch_product = BranchProduct.query.get_or_404(int(item_data['product_id']))
+                    product_name = branch_product.catalog_product.name
                     
                     # Check stock availability (allow zero stock sales with warning)
-                    if product.stock is not None and product.stock < quantity:
+                    if branch_product.stock is not None and branch_product.stock < quantity:
                         # Allow the order but log a warning about insufficient stock
-                        print(f"Warning: Ordering {quantity} units of {product.name} but only {product.stock} available in stock")
+                        print(f"Warning: Ordering {quantity} units of {branch_product.catalog_product.name} but only {branch_product.stock} available in stock")
                         # You could also add this to a warnings log or notification system
                     
                     # Calculate prices
-                    original_price = float(product.sellingprice or 0)
+                    original_price = float(branch_product.sellingprice or 0)
                     negotiated_price = float(item_data.get('negotiated_price', original_price)) if item_data.get('negotiated_price') else None
                     final_price = negotiated_price if negotiated_price is not None else original_price
                     
                     # Create new order item
                     order_item = OrderItem(
                         orderid=order.id,
-                        productid=product.id,
-                        product_name=product.name,  # Use product name from database
+                        branch_productid=branch_product.id,
+                        product_name=branch_product.catalog_product.name,  # Use product name from database
                         quantity=quantity,
-                        buying_price=float(product.buyingprice) if product.buyingprice is not None and product.buyingprice > 0 else None,
+                        buying_price=float(branch_product.buyingprice) if branch_product.buyingprice is not None and branch_product.buyingprice > 0 else None,
                         original_price=original_price,
                         negotiated_price=negotiated_price,
                         final_price=final_price,
@@ -377,7 +377,7 @@ class OrderService:
                     # Create new order item
                     order_item = OrderItem(
                         orderid=order.id,
-                        productid=None,  # Manual items have no product ID
+                        branch_productid=None,  # Manual items have no product ID
                         product_name=product_name,  # Use product name from item data
                         quantity=quantity,
                         buying_price=buying_price,
@@ -573,14 +573,14 @@ class StockService:
     def add_stock(product_id, quantity, current_user, notes=None):
         """Add stock to a product"""
         try:
-            product = Product.query.get_or_404(product_id)
+            branch_product = BranchProduct.query.get_or_404(product_id)
             
-            previous_stock = product.stock
-            product.stock += quantity
-            new_stock = product.stock
+            previous_stock = branch_product.stock
+            branch_product.stock += quantity
+            new_stock = branch_product.stock
             
             stock_transaction = StockTransaction(
-                productid=product.id,
+                productid=branch_product.id,
                 userid=current_user.id,
                 transaction_type='add',
                 quantity=quantity,
@@ -602,17 +602,17 @@ class StockService:
     def remove_stock(product_id, quantity, current_user, notes=None):
         """Remove stock from a product"""
         try:
-            product = Product.query.get_or_404(product_id)
+            branch_product = BranchProduct.query.get_or_404(product_id)
             
-            if product.stock is None or product.stock < quantity:
+            if branch_product.stock is None or branch_product.stock < quantity:
                 raise ValueError('Insufficient stock')
             
-            previous_stock = product.stock
-            product.stock -= quantity
-            new_stock = product.stock
+            previous_stock = branch_product.stock
+            branch_product.stock -= quantity
+            new_stock = branch_product.stock
             
             stock_transaction = StockTransaction(
-                productid=product.id,
+                productid=branch_product.id,
                 userid=current_user.id,
                 transaction_type='remove',
                 quantity=quantity,
@@ -763,7 +763,7 @@ class QuotationService:
     def create_quotation(data, current_user):
         """Create a new quotation"""
         try:
-            from app.models import Quotation, QuotationItem, Product
+            from app.models import Quotation, QuotationItem, BranchProduct
             
             # Generate quotation number
             quotation_number = QuotationService.generate_quotation_number()
@@ -800,15 +800,15 @@ class QuotationService:
                 # Check if this is a manual item (no product_id) or regular product
                 if item_data.get('product_id'):
                     # Regular product - get product details from database
-                    product = Product.query.get_or_404(int(item_data['product_id']))
-                    unit_price = float(item_data.get('unit_price', product.sellingprice or 0))
+                    branch_product = BranchProduct.query.get_or_404(int(item_data['product_id']))
+                    unit_price = float(item_data.get('unit_price', branch_product.sellingprice or 0))
                     
                     if unit_price <= 0:
-                        raise ValueError(f'Valid unit price is required for product {product.name}')
+                        raise ValueError(f'Valid unit price is required for product {branch_product.catalog_product.name}')
                     
                     quotation_item = QuotationItem(
                         quotation_id=quotation.id,
-                        product_id=product.id,
+                        product_id=branch_product.id,
                         quantity=quantity,
                         unit_price=unit_price,
                         total_price=quantity * unit_price,

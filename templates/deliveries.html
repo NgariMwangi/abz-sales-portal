@@ -77,7 +77,7 @@
                         </td>
                         <td>{{ delivery.customer_phone }}</td>
                         <td>{{ delivery.delivery_location }}</td>
-                        <td>KSh{{ "%.2f"|format(delivery.delivery_amount) }}</td>
+                        <td>KSh{{ delivery.delivery_amount|format_currency }}</td>
                         <td>
                             <span class="badge 
                                 {% if delivery.delivery_status == 'delivered' %}bg-success

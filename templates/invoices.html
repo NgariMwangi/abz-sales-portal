@@ -82,7 +82,7 @@
                             </td>
                             <td>{{ invoice.customer_name }}</td>
                             <td>
-                                <span class="fw-bold text-success">KSh{{ "%.2f"|format(invoice.total_amount) }}</span>
+                                <span class="fw-bold text-success">KSh{{ invoice.total_amount|format_currency }}</span>
                             </td>
                             <td>
                                 {% if invoice.status == 'paid' %}

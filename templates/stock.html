@@ -59,11 +59,11 @@
                                                             {% if product.stock is none %}
                                                                 <span class="badge bg-secondary fs-6">0</span>
                                                             {% elif product.stock < 10 %}
-                                                                <span class="badge bg-danger fs-6">{{ product.stock }}</span>
+                                                                <span class="badge bg-danger fs-6">{{ product.stock|format_quantity }}</span>
                                                             {% elif product.stock < 50 %}
-                                                                <span class="badge bg-warning fs-6">{{ product.stock }}</span>
+                                                                <span class="badge bg-warning fs-6">{{ product.stock|format_quantity }}</span>
                                                             {% else %}
-                                                                <span class="badge bg-success fs-6">{{ product.stock }}</span>
+                                                                <span class="badge bg-success fs-6">{{ product.stock|format_quantity }}</span>
                                                             {% endif %}
                                                         </td>
                                                         
@@ -202,7 +202,7 @@
                         <div class="form-check">
                             <input class="form-check-input product-checkbox" type="checkbox" value="{{ product.id }}" id="product{{ product.id }}">
                             <label class="form-check-label" for="product{{ product.id }}">
-                                {{ product.name }} (Current: {{ product.stock }})
+                                {{ product.name }} (Current: {{ product.stock|format_quantity }})
                             </label>
                         </div>
                         {% endfor %}

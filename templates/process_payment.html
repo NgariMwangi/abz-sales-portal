@@ -99,7 +99,7 @@
                                 {% endif %}
                             </strong><br>
                             <small class="text-muted">
-                                Qty: {{ item.quantity }} × 
+                                Qty: {{ item.quantity|format_quantity }} × 
                                 KSh{{ 
                                     item.original_price if item.original_price 
                                     else (item.product.sellingprice if item.product else 0) 
@@ -108,12 +108,7 @@
                         </div>
                         <div class="text-end">
                             <strong>
-                                KSh{{ "%.2f"|format(
-                                    item.quantity * (
-                                        item.original_price if item.original_price 
-                                        else (item.product.sellingprice if item.product else 0)
-                                    )
-                                ) }}
+                                KSh{{ (item.quantity * (item.original_price if item.original_price else (item.product.sellingprice if item.product else 0)))|format_currency }}
                             </strong>
                         </div>
                     </div>
@@ -121,7 +116,7 @@
                     <hr>
                     <div class="d-flex justify-content-between align-items-center">
                         <h6 class="mb-0">Total Amount:</h6>
-                        <h5 class="mb-0 text-success">KSh{{ "%.2f"|format(total_amount) }}</h5>
+                        <h5 class="mb-0 text-success">KSh{{ total_amount|format_currency }}</h5>
                     </div>
                 </div>
             </div>
@@ -141,7 +136,7 @@
                                 <div class="input-group">
                                     <span class="input-group-text">KSh</span>
                                     <input type="number" class="form-control" id="amount" name="amount" 
-                                           value="{{ "%.2f"|format(total_amount) }}" step="0.01" required>
+                                           value="{{ total_amount }}" step="0.01" required>
                                 </div>
                             </div>
                             <div class="col-md-6 mb-3">
@@ -214,7 +209,7 @@
                                 {% for payment in payment_history %}
                                 <tr>
                                     <td>{{ payment.payment_date.strftime('%Y-%m-%d %H:%M') if payment.payment_date else payment.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                                    <td>KSh{{ "%.2f"|format(payment.amount) }}</td>
+                                    <td>KSh{{ payment.amount|format_currency }}</td>
                                     <td>
                                         <span class="badge bg-info">{{ payment.payment_method|title }}</span>
                                     </td>
@@ -537,7 +532,7 @@ function updatePaymentHistory(paymentData) {
 
 function resetForm() {
     document.getElementById('paymentForm').reset();
-    document.getElementById('amount').value = '{{ "%.2f"|format(total_amount) }}';
+    document.getElementById('amount').value = '{{ total_amount }}';
 }
 
 // Auto-format amount input

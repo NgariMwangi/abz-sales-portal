@@ -47,14 +47,14 @@
                             </td>
                             <td>{{ receipt.customer_name }}</td>
                             <td>
-                                <span class="fw-bold text-success">KSh{{ "%.2f"|format(receipt.payment_amount) }}</span>
+                                <span class="fw-bold text-success">KSh{{ receipt.payment_amount|format_currency }}</span>
                             </td>
                             <td>
-                                <span class="text-warning">KSh{{ "%.2f"|format(receipt.previous_balance) }}</span>
+                                <span class="text-warning">KSh{{ receipt.previous_balance|format_currency }}</span>
                             </td>
                             <td>
                                 <span class="{% if receipt.remaining_balance > 0 %}text-danger{% else %}text-success{% endif %}">
-                                    KSh{{ "%.2f"|format(receipt.remaining_balance) }}
+                                    KSh{{ receipt.remaining_balance|format_currency }}
                                 </span>
                             </td>
                             <td>

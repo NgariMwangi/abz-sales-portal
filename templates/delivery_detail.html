@@ -33,7 +33,7 @@
                         <p><strong>Location:</strong> {{ delivery.delivery_location }}</p>
                     </div>
                     <div class="col-sm-6">
-                        <p><strong>Delivery Amount:</strong> KSh{{ "%.2f"|format(delivery.delivery_amount) }}</p>
+                        <p><strong>Delivery Amount:</strong> KSh{{ delivery.delivery_amount|format_currency }}</p>
                         <p><strong>Delivery Status:</strong> 
                             <span class="badge 
                                 {% if delivery.delivery_status == 'delivered' %}bg-success
@@ -96,7 +96,7 @@
                         {% if delivery.order.approvalstatus %}Approved{% else %}Pending{% endif %}
                     </span>
                 </p>
-                <p><strong>Order Total:</strong> KSh{{ "%.2f"|format(order_total) }}</p>
+                <p><strong>Order Total:</strong> KSh{{ order_total|format_currency }}</p>
                 <p><strong>Order Created:</strong> {{ delivery.order.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
             </div>
         </div>
@@ -132,9 +132,9 @@
                                 Manual Item
                             {% endif %}
                         </td>
-                        <td>{{ item.quantity }}</td>
-                        <td>KSh{{ "%.2f"|format(item.final_price) }}</td>
-                        <td>KSh{{ "%.2f"|format(item.final_price * item.quantity) }}</td>
+                        <td>{{ item.quantity|format_quantity }}</td>
+                        <td>KSh{{ item.final_price|format_currency }}</td>
+                        <td>KSh{{ (item.final_price * item.quantity)|format_currency }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -170,7 +170,7 @@
                         <td>
                             <a href="{{ url_for('payment_detail', payment_id=payment.id) }}">#{{ payment.id }}</a>
                         </td>
-                        <td>KSh{{ "%.2f"|format(payment.amount) }}</td>
+                        <td>KSh{{ payment.amount|format_currency }}</td>
                         <td>{{ payment.payment_method }}</td>
                         <td>
                             <span class="badge {% if payment.payment_status == 'completed' %}bg-success{% else %}bg-warning{% endif %}">

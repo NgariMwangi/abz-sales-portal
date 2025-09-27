@@ -12,7 +12,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from main import app
-from app.models import OrderItem, Product
+from app.models import OrderItem, BranchProduct
 from app import db
 from sqlalchemy import text
 
@@ -71,14 +71,15 @@ def migrate_price_negotiation():
             for item in order_items:
                 try:
                     # Get the product's selling price
-                    product = Product.query.get(item.productid)
-                    if product and product.sellingprice is not None:
-                        original_price = float(product.sellingprice)
-                        final_price = original_price
-                        
-                        # Update the order item
-                        item.original_price = original_price
-                        item.final_price = final_price
+                    if item.branch_productid:
+                        branch_product = BranchProduct.query.get(item.branch_productid)
+                        if branch_product and branch_product.sellingprice is not None:
+                            original_price = float(branch_product.sellingprice)
+                            final_price = original_price
+                            
+                            # Update the order item
+                            item.original_price = original_price
+                            item.final_price = final_price
                         item.negotiated_price = None  # No negotiation for existing items
                         item.negotiation_notes = None
                         

@@ -486,7 +486,13 @@
 <script>
 let orderItems = [];
 let products = [];
+let searchQuery = '';
 let searchTimeout;
+
+// Helper function to format numbers without showing .00 for whole numbers
+function formatNumber(num) {
+    return num % 1 === 0 ? num.toString() : num.toFixed(2);
+}
 
 // Load existing order items when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -542,9 +548,13 @@ function loadProducts() {
     // Show loading state
     showSearchIndicator();
     
-    let url = '/api/products?';
-    if (categoryId) url += `category_id=${categoryId}&`;
-    if (branchId) url += `branch_id=${branchId}&`;
+    // Build API URL with search query
+    const params = new URLSearchParams();
+    if (categoryId) params.append('category_id', categoryId);
+    if (branchId) params.append('branch_id', branchId);
+    if (searchQuery) params.append('search', searchQuery);
+    
+    const url = `/api/products?${params.toString()}`;
     
     fetch(url)
         .then(response => {
@@ -566,40 +576,74 @@ function loadProducts() {
 }
 
 function performSearch() {
+    const searchInput = document.getElementById('product_search');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    
+    const newSearchQuery = searchInput.value.trim();
+    
+    // Only perform search if query actually changed
+    if (newSearchQuery === searchQuery) {
+        return;
+    }
+    
+    searchQuery = newSearchQuery;
+    
+    // Update UI based on search state
+    if (searchQuery) {
+        searchBtn.style.display = 'none';
+        clearSearchBtn.style.display = 'block';
+        searchInput.classList.add('is-valid');
+        
+        // Show loading state in clear button temporarily
+        clearSearchBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i>';
+        clearSearchBtn.disabled = true;
+        
+        // Add visual feedback to search input
+        searchInput.classList.add('searching');
+        
+        // Show search indicator
+        showSearchIndicator('Searching...');
+    } else {
+        searchBtn.style.display = 'block';
+        clearSearchBtn.style.display = 'none';
+        searchInput.classList.remove('is-valid');
+        searchInput.classList.remove('searching');
+        hideSearchIndicator();
+    }
+    
+    // Debounce the search to avoid too many API calls
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-        const searchTerm = document.getElementById('product_search').value.toLowerCase().trim();
-        const clearBtn = document.getElementById('clearSearchBtn');
-        
-        if (searchTerm) {
-            clearBtn.style.display = 'block';
-            showSearchIndicator();
-            
-            // Filter products based on search term
-            const filteredProducts = products.filter(product => 
-                product.name.toLowerCase().includes(searchTerm) ||
-                product.code?.toLowerCase().includes(searchTerm) ||
-                product.selling_price.toString().includes(searchTerm)
-            );
-            
-            updateProductSelect(filteredProducts);
-            hideSearchIndicator();
-        } else {
-            clearBtn.style.display = 'none';
-            updateProductSelect();
-        }
+        loadProducts();
     }, 300);
 }
 
 function clearSearch() {
-    document.getElementById('product_search').value = '';
-    document.getElementById('clearSearchBtn').style.display = 'none';
-    updateProductSelect();
+    const searchInput = document.getElementById('product_search');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    
+    // Clear search input
+    searchInput.value = '';
+    searchInput.classList.remove('is-valid');
+    searchInput.classList.remove('searching');
+    
+    // Reset UI
+    searchBtn.style.display = 'block';
+    clearSearchBtn.style.display = 'none';
+    clearSearchBtn.innerHTML = '<i class="bi bi-x"></i>';
+    clearSearchBtn.disabled = false;
+    
+    // Clear search query and reload products
+    searchQuery = '';
+    hideSearchIndicator();
+    loadProducts();
 }
 
-function showSearchIndicator() {
+function showSearchIndicator(message = 'Searching...') {
     const productCount = document.getElementById('product_count');
-    productCount.innerHTML = '<i class="bi bi-arrow-clockwise spin me-1"></i>Searching...';
+    productCount.innerHTML = `<i class="bi bi-arrow-clockwise spin me-1"></i>${message}`;
 }
 
 function hideSearchIndicator() {
@@ -620,7 +664,7 @@ function updateProductSelect(filteredProducts = null) {
     productsToShow.forEach(product => {
         const option = document.createElement('option');
         option.value = product.id;
-        option.textContent = `${product.name} - KSh${product.selling_price} (Stock: ${product.stock.toFixed(2)})`;
+        option.textContent = `${product.name} [${product.product_code}] - KSh${product.selling_price} (Stock: ${product.stock.toFixed(2)})`;
         select.appendChild(option);
     });
     
@@ -643,14 +687,14 @@ function updateProductCount(productsToShow = null) {
 function increaseQuantity() {
     const quantityInput = document.getElementById('quantity');
     const currentValue = parseFloat(quantityInput.value) || 0;
-    quantityInput.value = (currentValue + 1).toFixed(2);
+    quantityInput.value = formatNumber(currentValue + 1);
 }
 
 function decreaseQuantity() {
     const quantityInput = document.getElementById('quantity');
     const currentValue = parseFloat(quantityInput.value) || 0;
     if (currentValue > 0.01) {
-        quantityInput.value = (currentValue - 1).toFixed(2);
+        quantityInput.value = formatNumber(currentValue - 1);
     }
 }
 
@@ -955,18 +999,18 @@ function updateOrderItemsDisplay() {
                 </td>
                 <td>
                     <div class="input-group input-group-sm">
-                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity(${index}, ${item.quantity - 1})">
+                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity(${index}, ${formatNumber(item.quantity - 1)})">
                             <i class="bi bi-dash"></i>
                         </button>
                         <input type="number" 
                                class="form-control text-center" 
-                               value="${item.quantity}" 
+                               value="${formatNumber(item.quantity)}" 
                                min="0.01"
                                step="0.01"
                                data-index="${index}"
                                onchange="updateQuantity(${index}, this.value)"
                                title="Enter quantity (supports decimals like 0.5)">
-                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity(${index}, ${item.quantity + 1})">
+                        <button class="btn btn-outline-secondary" type="button" onclick="updateQuantity(${index}, ${formatNumber(item.quantity + 1)})">
                             <i class="bi bi-plus"></i>
                         </button>
                     </div>

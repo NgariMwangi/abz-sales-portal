@@ -171,7 +171,7 @@
                                          <option value="">Select Product</option>
                                          {% for product in products %}
                                          <option value="{{ product.id }}" {% if product.id == item.product_id %}selected{% endif %}>
-                                             {{ product.name }} - {{ product.productcode or 'No Code' }}
+                                             {{ product.catalog_product.name if product.catalog_product else 'Unknown Product' }} - {{ product.catalog_product.productcode if product.catalog_product else 'No Code' }}
                                          </option>
                                          {% endfor %}
                                      </select>
@@ -184,7 +184,7 @@
                              </div>
                              <div class="col-md-2">
                                  <label class="form-label">Quantity</label>
-                                 <input type="number" class="form-control" name="quantity[]" value="{{ item.quantity }}" min="1" required>
+                                 <input type="number" class="form-control" name="quantity[]" value="{{ item.quantity|format_quantity }}" min="1" required>
                              </div>
                              <div class="col-md-2">
                                  <label class="form-label">Unit Price</label>
@@ -192,7 +192,7 @@
                              </div>
                              <div class="col-md-2">
                                  <label class="form-label">Total</label>
-                                 <input type="text" class="form-control" value="KSh{{ "%.2f"|format(item.total_price) }}" readonly>
+                                 <input type="text" class="form-control" value="KSh{{ item.total_price|format_currency }}" readonly>
                              </div>
                              <div class="col-md-2">
                                  <label class="form-label">Notes</label>
@@ -227,7 +227,7 @@
                     </div>
                                          <div class="col-md-6 text-end">
                          <h6>Total Amount</h6>
-                         <h3 class="text-primary" id="grandTotal">KSh{{ "%.2f"|format(quotation.total_amount) }}</h3>
+                         <h3 class="text-primary" id="grandTotal">KSh{{ quotation.total_amount|format_currency }}</h3>
                      </div>
                 </div>
                 
@@ -258,8 +258,8 @@ document.getElementById('category_filter').addEventListener('change', function()
         {% for product in products %}
         {
             id: '{{ product.id }}',
-            name: '{{ product.name }} - {{ product.productcode or "No Code" }}',
-            subcategory_id: '{{ product.subcategory_id }}'
+            name: '{{ product.catalog_product.name if product.catalog_product else "Unknown Product" }} - {{ product.catalog_product.productcode if product.catalog_product else "No Code" }}',
+            subcategory_id: '{{ product.catalog_product.subcategory_id if product.catalog_product else "" }}'
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
@@ -377,7 +377,7 @@ function addProduct() {
                         <option value="">Select Product</option>
                         {% for product in products %}
                         <option value="{{ product.id }}" ${productSelect.value == '{{ product.id }}' ? 'selected' : ''}>
-                            {{ product.name }} - {{ product.productcode or 'No Code' }}
+                            {{ product.catalog_product.name if product.catalog_product else 'Unknown Product' }} - {{ product.catalog_product.productcode if product.catalog_product else 'No Code' }}
                         </option>
                         {% endfor %}
                     </select>
