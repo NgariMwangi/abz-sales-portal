@@ -295,14 +295,19 @@ document.getElementById('product_select').addEventListener('change', function() 
 // Calculate total when quantity or unit price changes
 function calculateTotal(input) {
     const item = input.closest('.quotation-item');
-    const quantity = item.querySelector('input[name="quantity[]"]').value;
-    const unitPrice = item.querySelector('input[name="unit_price[]"]').value;
+    const quantityInput = item.querySelector('input[name="quantity[]"]');
+    const unitPriceInput = item.querySelector('input[name="unit_price[]"]');
     
-    // Find the total input specifically by looking for the one with "Total" label
-    const totalInput = item.querySelector('input[value*="KSh"]');
+    if (!quantityInput || !unitPriceInput) return;
     
-    if (quantity && unitPrice && totalInput) {
-        const total = (parseFloat(quantity) * parseFloat(unitPrice)).toFixed(2);
+    const quantity = parseFloat(quantityInput.value) || 0;
+    const unitPrice = parseFloat(unitPriceInput.value) || 0;
+    
+    // Find the total input - it's the readonly input in the same row
+    const totalInput = item.querySelector('input[readonly]');
+    
+    if (totalInput) {
+        const total = (quantity * unitPrice).toFixed(2);
         totalInput.value = `KSh${total}`;
     }
     
@@ -316,11 +321,16 @@ function updateGrandTotal() {
     let grandTotal = 0;
     
     items.forEach(item => {
-        const totalInput = item.querySelector('input[value*="KSh"]');
-        if (totalInput && totalInput.value) {
-            const totalValue = parseFloat(totalInput.value.replace('KSh', ''));
-            if (!isNaN(totalValue)) {
-                grandTotal += totalValue;
+        const quantityInput = item.querySelector('input[name="quantity[]"]');
+        const unitPriceInput = item.querySelector('input[name="unit_price[]"]');
+        
+        if (quantityInput && unitPriceInput) {
+            const quantity = parseFloat(quantityInput.value) || 0;
+            const unitPrice = parseFloat(unitPriceInput.value) || 0;
+            const itemTotal = quantity * unitPrice;
+            
+            if (!isNaN(itemTotal)) {
+                grandTotal += itemTotal;
             }
         }
     });

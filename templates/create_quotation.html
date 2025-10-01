@@ -42,6 +42,18 @@
         background-color: #d4edda;
         color: #155724;
     }
+    
+    .table-info {
+        background-color: #d1ecf1 !important;
+    }
+    
+    .table-info:hover {
+        background-color: #bee5eb !important;
+    }
+    
+    #cancelEditBtn {
+        display: none;
+    }
 </style>
 {% endblock %}
 
@@ -135,6 +147,9 @@
                         <button type="button" class="btn btn-success w-100" onclick="addProduct()">
                             <i class="fas fa-plus"></i> Add Product
                         </button>
+                        <button type="button" id="cancelEditProductBtn" class="btn btn-secondary w-100 mt-2" onclick="cancelEdit()" style="display: none;">
+                            <i class="fas fa-times"></i> Cancel Edit
+                        </button>
                         
                         <!-- Manual Item Section -->
                         <hr class="my-4">
@@ -170,6 +185,9 @@
                                 </button>
                                 <button type="button" class="btn btn-outline-secondary ms-2" onclick="clearManualItemForm()">
                                     <i class="bi bi-x-circle me-2"></i>Clear Form
+                                </button>
+                                <button type="button" id="cancelEditManualBtn" class="btn btn-secondary ms-2" onclick="cancelEdit()" style="display: none;">
+                                    <i class="fas fa-times"></i> Cancel Edit
                                 </button>
                             </div>
                         </div>
@@ -228,6 +246,7 @@
 <script>
 let quotationItems = [];
 let products = [];
+let editingIndex = -1; // Track which item is being edited (-1 means not editing)
 
 // Load products when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -307,18 +326,38 @@ function addProduct() {
         return;
     }
     
-    // Check if product already exists in quotation
-    const existingItem = quotationItems.find(item => item.product_id == productId);
-    if (existingItem) {
-        existingItem.quantity += quantity;
-    } else {
-        quotationItems.push({
+    // If editing an existing item, update it
+    if (editingIndex !== -1) {
+        quotationItems[editingIndex] = {
             product_id: parseInt(productId),
             product_name: product.name,
             quantity: quantity,
             unit_price: unitPrice,
             notes: notes
-        });
+        };
+        editingIndex = -1;
+        const productBtn = document.querySelector('[onclick="addProduct()"]');
+        productBtn.innerHTML = '<i class="fas fa-plus"></i> Add Product';
+        productBtn.classList.remove('btn-warning');
+        productBtn.classList.add('btn-success');
+        document.getElementById('cancelEditProductBtn').style.display = 'none';
+    } else {
+        // Check if product already exists in quotation
+        const existingItemIndex = quotationItems.findIndex(item => item.product_id == productId);
+        if (existingItemIndex !== -1) {
+            const confirmAction = confirm('This product is already in the quotation. Do you want to add more quantity or replace it?');
+            if (confirmAction) {
+                quotationItems[existingItemIndex].quantity += quantity;
+            }
+        } else {
+            quotationItems.push({
+                product_id: parseInt(productId),
+                product_name: product.name,
+                quantity: quantity,
+                unit_price: unitPrice,
+                notes: notes
+            });
+        }
     }
     
     updateQuotationItemsDisplay();
@@ -355,15 +394,36 @@ function addManualItem() {
         return;
     }
 
+    // If editing an existing item, update it
+    if (editingIndex !== -1) {
+        quotationItems[editingIndex] = {
+            product_id: null,
+            product_name: itemName,
+            quantity: quantity,
+            unit_price: unitPrice,
+            notes: notes
+        };
+        editingIndex = -1;
+        const manualBtn = document.querySelector('[onclick="addManualItem()"]');
+        manualBtn.innerHTML = '<i class="bi bi-plus-circle me-2"></i>Add Manual Item';
+        manualBtn.classList.remove('btn-primary');
+        manualBtn.classList.add('btn-outline-primary');
+        document.getElementById('cancelEditManualBtn').style.display = 'none';
+        updateQuotationItemsDisplay();
+        updateTotal();
+        clearManualItemForm();
+        return;
+    }
+
     // Check if item already exists in quotation (case-insensitive)
-    const existingItem = quotationItems.find(item => 
-        item.product_name.toLowerCase() === itemName.toLowerCase()
+    const existingItemIndex = quotationItems.findIndex(item => 
+        item.product_id === null && item.product_name.toLowerCase() === itemName.toLowerCase()
     );
     
-    if (existingItem) {
+    if (existingItemIndex !== -1) {
         const confirmAdd = confirm(`Item "${itemName}" already exists in the quotation. Do you want to add ${quantity} more units?`);
         if (confirmAdd) {
-            existingItem.quantity += quantity;
+            quotationItems[existingItemIndex].quantity += quantity;
             updateQuotationItemsDisplay();
             updateTotal();
             clearManualItemForm();
@@ -409,10 +469,87 @@ function clearManualItemForm() {
     document.getElementById('manual_item_notes').value = '';
 }
 
-function removeProduct(index) {
-    quotationItems.splice(index, 1);
+function editProduct(index) {
+    const item = quotationItems[index];
+    editingIndex = index;
+    
+    // Scroll to the appropriate form
+    if (item.product_id === null) {
+        // Manual item - populate manual item form
+        document.getElementById('manual_item_name').value = item.product_name;
+        document.getElementById('manual_quantity').value = item.quantity;
+        document.getElementById('manual_unit_price').value = item.unit_price;
+        document.getElementById('manual_item_notes').value = item.notes || '';
+        
+        // Change button text and show cancel button
+        const manualBtn = document.querySelector('[onclick="addManualItem()"]');
+        manualBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Update Manual Item';
+        manualBtn.classList.remove('btn-outline-primary');
+        manualBtn.classList.add('btn-primary');
+        document.getElementById('cancelEditManualBtn').style.display = 'inline-block';
+        
+        // Scroll to manual item section
+        document.querySelector('.manual-item-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+        // Regular product - populate product form
+        document.getElementById('product_select').value = item.product_id;
+        document.getElementById('quantity').value = item.quantity;
+        document.getElementById('unit_price').value = item.unit_price;
+        document.getElementById('item_notes').value = item.notes || '';
+        
+        // Change button text and show cancel button
+        const productBtn = document.querySelector('[onclick="addProduct()"]');
+        productBtn.innerHTML = '<i class="fas fa-check"></i> Update Product';
+        productBtn.classList.remove('btn-success');
+        productBtn.classList.add('btn-warning');
+        document.getElementById('cancelEditProductBtn').style.display = 'block';
+        
+        // Scroll to product selection section
+        document.getElementById('product_select').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+function cancelEdit() {
+    editingIndex = -1;
+    
+    // Reset product form
+    document.getElementById('product_select').value = '';
+    document.getElementById('quantity').value = '1';
+    document.getElementById('unit_price').value = '';
+    document.getElementById('item_notes').value = '';
+    const productBtn = document.querySelector('[onclick="addProduct()"]');
+    productBtn.innerHTML = '<i class="fas fa-plus"></i> Add Product';
+    productBtn.classList.remove('btn-warning');
+    productBtn.classList.add('btn-success');
+    document.getElementById('cancelEditProductBtn').style.display = 'none';
+    
+    // Reset manual item form
+    clearManualItemForm();
+    const manualBtn = document.querySelector('[onclick="addManualItem()"]');
+    manualBtn.innerHTML = '<i class="bi bi-plus-circle me-2"></i>Add Manual Item';
+    manualBtn.classList.remove('btn-primary');
+    manualBtn.classList.add('btn-outline-primary');
+    document.getElementById('cancelEditManualBtn').style.display = 'none';
+    
+    // Update display to remove editing highlight
     updateQuotationItemsDisplay();
-    updateTotal();
+}
+
+function removeProduct(index) {
+    if (confirm('Are you sure you want to remove this item?')) {
+        quotationItems.splice(index, 1);
+        
+        // If we were editing this item, cancel the edit
+        if (editingIndex === index) {
+            cancelEdit();
+        } else if (editingIndex > index) {
+            // Adjust editing index if needed
+            editingIndex--;
+        }
+        
+        updateQuotationItemsDisplay();
+        updateTotal();
+    }
 }
 
 function updateQuotationItemsDisplay() {
@@ -453,20 +590,25 @@ function updateQuotationItemsDisplay() {
     quotationItems.forEach((item, index) => {
         const total = item.quantity * item.unit_price;
         const isManualItem = item.product_id === null;
+        const isEditing = editingIndex === index;
         
         html += `
-            <tr class="${isManualItem ? 'table-warning' : ''}">
+            <tr class="${isManualItem ? 'table-warning' : ''} ${isEditing ? 'table-info' : ''}">
                 <td>
                     ${item.product_name}
                     ${isManualItem ? '<span class="badge bg-warning text-dark ms-2">Manual</span>' : ''}
+                    ${isEditing ? '<span class="badge bg-info ms-2">Editing</span>' : ''}
                 </td>
                 <td>${item.quantity}</td>
                 <td>KSh${item.unit_price.toFixed(2)}</td>
                 <td>KSh${total.toFixed(2)}</td>
                 <td>${item.notes || '-'}</td>
                 <td>
-                    <button type="button" class="btn btn-danger btn-sm" onclick="removeProduct(${index})">
-                        Remove
+                    <button type="button" class="btn btn-primary btn-sm me-1" onclick="editProduct(${index})" title="Edit this item">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removeProduct(${index})" title="Remove this item">
+                        <i class="fas fa-trash"></i>
                     </button>
                 </td>
             </tr>
