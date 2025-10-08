@@ -140,6 +140,18 @@
                                 {% endfor %}
                             </tbody>
                             <tfoot>
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
+                                    <td><strong>KSh{{ quotation.subtotal|format_currency }}</strong></td>
+                                    <td></td>
+                                </tr>
+                                {% if quotation.include_vat %}
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>VAT ({{ quotation.vat_rate|default(16) }}%):</strong></td>
+                                    <td><strong>KSh{{ quotation.vat_amount|format_currency }}</strong></td>
+                                    <td></td>
+                                </tr>
+                                {% endif %}
                                 <tr class="table-info">
                                     <td colspan="3" class="text-end"><strong>Total:</strong></td>
                                     <td><strong>KSh{{ quotation.total_amount|format_currency }}</strong></td>

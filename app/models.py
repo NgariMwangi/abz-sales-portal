@@ -435,6 +435,8 @@ class Quotation(db.Model):
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=False)
     subtotal = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     total_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    include_vat = db.Column(db.Boolean, default=False, nullable=False)
+    vat_rate = db.Column(db.Numeric(5, 2), default=16.00, nullable=False)  # VAT percentage (e.g., 16.00 for 16%)
     status = db.Column(db.String, default='pending')  # pending, accepted, rejected, expired
     valid_until = db.Column(db.DateTime, nullable=True)
     notes = db.Column(db.Text, nullable=True)
@@ -445,6 +447,20 @@ class Quotation(db.Model):
     items = db.relationship('QuotationItem', backref='quotation', lazy=True, cascade='all, delete-orphan')
     creator = db.relationship('User', backref='quotations_created')
     branch = db.relationship('Branch', backref='quotations')
+    
+    @property
+    def vat_amount(self):
+        """Calculate VAT amount based on subtotal and vat_rate"""
+        from decimal import Decimal
+        if self.include_vat and self.subtotal:
+            return Decimal(str(self.subtotal)) * (Decimal(str(self.vat_rate)) / Decimal('100'))
+        return Decimal('0.00')
+    
+    def calculate_totals(self):
+        """Recalculate subtotal and total_amount based on items"""
+        from decimal import Decimal
+        self.subtotal = sum(item.total_price for item in self.items) if self.items else Decimal('0.00')
+        self.total_amount = Decimal(str(self.subtotal)) + self.vat_amount
 
 
 class QuotationItem(db.Model):

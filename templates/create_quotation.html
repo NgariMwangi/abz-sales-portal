@@ -104,6 +104,15 @@
                             <label for="notes" class="form-label">Notes</label>
                             <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Additional notes..."></textarea>
                         </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="include_vat" name="include_vat" onchange="updateTotal()">
+                                <label class="form-check-label" for="include_vat">
+                                    <strong>Include VAT (16%)</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Enable this to add 16% VAT to the quotation total</small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -229,9 +238,31 @@
                 <div id="quotationItems">
                     <p class="text-muted">No items added yet.</p>
                 </div>
-                <div class="d-flex justify-content-between align-items-center mt-3">
-                    <h4>Total: KSh<span id="totalAmount">0.00</span></h4>
-                    <button type="submit" class="btn btn-success" id="createQuotationBtn" disabled>Create Quotation</button>
+                <div class="mt-4">
+                    <div class="row">
+                        <div class="col-md-8"></div>
+                        <div class="col-md-4">
+                            <table class="table table-sm">
+                                <tr>
+                                    <td class="text-end"><strong>Subtotal:</strong></td>
+                                    <td class="text-end">KSh<span id="subtotalAmount">0.00</span></td>
+                                </tr>
+                                <tr id="vatRow" style="display: none;">
+                                    <td class="text-end"><strong>VAT (16%):</strong></td>
+                                    <td class="text-end">KSh<span id="vatAmount">0.00</span></td>
+                                </tr>
+                                <tr class="table-primary">
+                                    <td class="text-end"><h5 class="mb-0">Total:</h5></td>
+                                    <td class="text-end"><h5 class="mb-0">KSh<span id="totalAmount">0.00</span></h5></td>
+                                </tr>
+                            </table>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-success btn-lg" id="createQuotationBtn" disabled>
+                                    <i class="fas fa-check-circle"></i> Create Quotation
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -620,10 +651,24 @@ function updateQuotationItemsDisplay() {
 }
 
 function updateTotal() {
-    const total = quotationItems.reduce((sum, item) => {
+    const subtotal = quotationItems.reduce((sum, item) => {
         return sum + (item.quantity * item.unit_price);
     }, 0);
+    
+    const includeVat = document.getElementById('include_vat').checked;
+    const vatRate = 16; // 16%
+    const vatAmount = includeVat ? subtotal * (vatRate / 100) : 0;
+    const total = subtotal + vatAmount;
+    
+    // Update displays
+    document.getElementById('subtotalAmount').textContent = subtotal.toFixed(2);
+    document.getElementById('vatAmount').textContent = vatAmount.toFixed(2);
     document.getElementById('totalAmount').textContent = total.toFixed(2);
+    
+    // Show/hide VAT row
+    const vatRow = document.getElementById('vatRow');
+    vatRow.style.display = includeVat ? '' : 'none';
+    
     document.getElementById('quotationItemsData').value = JSON.stringify(quotationItems);
     document.getElementById('createQuotationBtn').disabled = quotationItems.length === 0;
 }

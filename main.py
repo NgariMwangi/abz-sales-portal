@@ -1414,6 +1414,8 @@ def edit_quotation(quotation_id):
             quotation.customer_phone = request.form.get('customer_phone')
             quotation.notes = request.form.get('notes')
             quotation.valid_until = datetime.strptime(request.form.get('valid_until'), '%Y-%m-%d') if request.form.get('valid_until') else None
+            quotation.include_vat = request.form.get('include_vat') in ['true', 'True', True, 'on']
+            quotation.vat_rate = float(request.form.get('vat_rate', 16.00))
             quotation.updated_at = datetime.utcnow()
             
             # Update items
@@ -1451,16 +1453,15 @@ def edit_quotation(quotation_id):
                 db.session.delete(item)
             
             # Add updated items
-            subtotal = 0
+            from decimal import Decimal
             
             # Create a more robust approach by processing each item individually
             # and finding the corresponding data from the form arrays
             for i in range(len(quantities)):
                 if quantities[i] and unit_prices[i]:
-                    quantity = int(quantities[i])
-                    unit_price = float(unit_prices[i])
+                    quantity = Decimal(str(quantities[i]))
+                    unit_price = Decimal(str(unit_prices[i]))
                     total_price = quantity * unit_price
-                    subtotal += total_price
                     
                     # Safely get values with bounds checking
                     item_id = item_ids[i] if i < len(item_ids) else ''
@@ -1515,8 +1516,8 @@ def edit_quotation(quotation_id):
                     
                     db.session.add(item)
             
-            quotation.subtotal = subtotal
-            quotation.total_amount = subtotal
+            # Update quotation totals using the model's calculate_totals method
+            quotation.calculate_totals()
             
             db.session.commit()
             flash('Quotation updated successfully!', 'success')

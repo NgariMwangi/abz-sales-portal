@@ -72,6 +72,15 @@
                             <label for="notes" class="form-label">Notes</label>
                             <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Additional notes...">{{ quotation.notes or '' }}</textarea>
                         </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="include_vat" name="include_vat" {% if quotation.include_vat %}checked{% endif %} onchange="updateGrandTotal()">
+                                <label class="form-check-label" for="include_vat">
+                                    <strong>Include VAT ({{ quotation.vat_rate|default(16) }}%)</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">Enable this to add VAT to the quotation total</small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -225,9 +234,21 @@
                         <p><strong>Created:</strong> {{ quotation.created_at.strftime('%B %d, %Y') }}</p>
                         <p><strong>Status:</strong> <span class="badge bg-{{ 'warning' if quotation.status == 'pending' else 'success' if quotation.status == 'accepted' else 'danger' if quotation.status == 'rejected' else 'secondary' }}">{{ quotation.status.title() }}</span></p>
                     </div>
-                                         <div class="col-md-6 text-end">
-                         <h6>Total Amount</h6>
-                         <h3 class="text-primary" id="grandTotal">KSh{{ quotation.total_amount|format_currency }}</h3>
+                                         <div class="col-md-6">
+                         <table class="table table-sm table-borderless">
+                             <tr>
+                                 <td class="text-end"><strong>Subtotal:</strong></td>
+                                 <td class="text-end" id="subtotalDisplay">KSh{{ quotation.subtotal|format_currency }}</td>
+                             </tr>
+                             <tr id="vatRow" {% if not quotation.include_vat %}style="display: none;"{% endif %}>
+                                 <td class="text-end"><strong>VAT ({{ quotation.vat_rate|default(16) }}%):</strong></td>
+                                 <td class="text-end" id="vatDisplay">KSh{{ quotation.vat_amount|format_currency }}</td>
+                             </tr>
+                             <tr class="border-top">
+                                 <td class="text-end"><h5 class="mb-0">Total Amount:</h5></td>
+                                 <td class="text-end"><h5 class="mb-0 text-primary" id="grandTotal">KSh{{ quotation.total_amount|format_currency }}</h5></td>
+                             </tr>
+                         </table>
                      </div>
                 </div>
                 
@@ -318,7 +339,7 @@ function calculateTotal(input) {
 // Calculate and update the grand total
 function updateGrandTotal() {
     const items = document.querySelectorAll('.quotation-item');
-    let grandTotal = 0;
+    let subtotal = 0;
     
     items.forEach(item => {
         const quantityInput = item.querySelector('input[name="quantity[]"]');
@@ -330,15 +351,37 @@ function updateGrandTotal() {
             const itemTotal = quantity * unitPrice;
             
             if (!isNaN(itemTotal)) {
-                grandTotal += itemTotal;
+                subtotal += itemTotal;
             }
         }
     });
     
-    // Update the grand total display
+    // Calculate VAT if enabled
+    const includeVat = document.getElementById('include_vat').checked;
+    const vatRate = 16; // 16%
+    const vatAmount = includeVat ? subtotal * (vatRate / 100) : 0;
+    const grandTotal = subtotal + vatAmount;
+    
+    // Update all displays
+    const subtotalElement = document.getElementById('subtotalDisplay');
+    if (subtotalElement) {
+        subtotalElement.textContent = `KSh${subtotal.toFixed(2)}`;
+    }
+    
+    const vatElement = document.getElementById('vatDisplay');
+    if (vatElement) {
+        vatElement.textContent = `KSh${vatAmount.toFixed(2)}`;
+    }
+    
     const grandTotalElement = document.getElementById('grandTotal');
     if (grandTotalElement) {
         grandTotalElement.textContent = `KSh${grandTotal.toFixed(2)}`;
+    }
+    
+    // Show/hide VAT row
+    const vatRow = document.getElementById('vatRow');
+    if (vatRow) {
+        vatRow.style.display = includeVat ? '' : 'none';
     }
 }
 

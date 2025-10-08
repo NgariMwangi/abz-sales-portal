@@ -764,6 +764,7 @@ class QuotationService:
         """Create a new quotation"""
         try:
             from app.models import Quotation, QuotationItem, BranchProduct
+            from decimal import Decimal
             
             # Generate quotation number
             quotation_number = QuotationService.generate_quotation_number()
@@ -778,22 +779,23 @@ class QuotationService:
                 branch_id=int(data['branch_id']),
                 valid_until=datetime.strptime(data['valid_until'], '%Y-%m-%d') if data.get('valid_until') else None,
                 notes=data.get('notes', ''),
-                subtotal=0.00,
-                total_amount=0.00
+                include_vat=data.get('include_vat') in ['true', 'True', True, 'on'],
+                vat_rate=Decimal(str(data.get('vat_rate', 16.00))),
+                subtotal=Decimal('0.00'),
+                total_amount=Decimal('0.00')
             )
             
             db.session.add(quotation)
             db.session.flush()
             
             # Add quotation items
-            total_amount = 0
             items_data = data.get('items', [])
             
             for item_data in items_data:
                 if not item_data.get('quantity'):
                     raise ValueError('Quantity is required for each item')
                 
-                quantity = float(item_data['quantity'])
+                quantity = Decimal(str(item_data['quantity']))
                 if quantity <= 0:
                     raise ValueError(f'Invalid quantity for item')
                 
@@ -801,7 +803,7 @@ class QuotationService:
                 if item_data.get('product_id'):
                     # Regular product - get product details from database
                     branch_product = BranchProduct.query.get_or_404(int(item_data['product_id']))
-                    unit_price = float(item_data.get('unit_price', branch_product.sellingprice or 0))
+                    unit_price = Decimal(str(item_data.get('unit_price', branch_product.sellingprice or 0)))
                     
                     if unit_price <= 0:
                         raise ValueError(f'Valid unit price is required for product {branch_product.catalog_product.name}')
@@ -820,7 +822,7 @@ class QuotationService:
                     if not product_name:
                         raise ValueError('Product name is required for manual items')
                     
-                    unit_price = float(item_data.get('unit_price', 0))
+                    unit_price = Decimal(str(item_data.get('unit_price', 0)))
                     if unit_price <= 0:
                         raise ValueError(f'Valid unit price is required for manual item: {product_name}')
                     
@@ -834,17 +836,14 @@ class QuotationService:
                         notes=item_data.get('notes', '')
                     )
                 
-                item_total = quantity * unit_price
-                total_amount += item_total
                 db.session.add(quotation_item)
             
-            # Update quotation totals
-            quotation.subtotal = total_amount
-            quotation.total_amount = total_amount
+            # Update quotation totals using the model's calculate_totals method
+            quotation.calculate_totals()
             
             db.session.commit()
             
-            return True, quotation.id, total_amount
+            return True, quotation.id, float(quotation.total_amount)
             
         except Exception as e:
             db.session.rollback()
