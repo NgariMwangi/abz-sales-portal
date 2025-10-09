@@ -822,19 +822,28 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
         elements.append(Paragraph("No items in this quotation.", normal_style))
         elements.append(Spacer(1, 30))
     
+    # Calculate totals dynamically from items
+    calculated_subtotal = sum(float(item.quantity) * float(item.unit_price) for item in quotation.items) if quotation.items else 0.00
+    
+    # Calculate VAT
+    vat_rate = float(quotation.vat_rate) if quotation.vat_rate else 16.00
+    calculated_vat = calculated_subtotal * (vat_rate / 100) if quotation.include_vat else 0.00
+    
+    # Calculate total
+    calculated_total = calculated_subtotal + calculated_vat
+    
     # Total Amount - show breakdown only if VAT is included
-    if quotation.total_amount:
+    if calculated_total:
         total_data = []
         
         if quotation.include_vat:
             # With VAT - show breakdown: Subtotal, VAT, and Total
-            total_data.append(['Subtotal:', format_currency(quotation.subtotal)])
+            total_data.append(['Subtotal:', format_currency(calculated_subtotal)])
             
-            vat_rate = float(quotation.vat_rate) if quotation.vat_rate else 16
             vat_label = f'VAT ({vat_rate:.0f}%):'
-            total_data.append([vat_label, format_currency(quotation.vat_amount)])
+            total_data.append([vat_label, format_currency(calculated_vat)])
             
-            total_data.append(['Total Amount:', format_currency(quotation.total_amount)])
+            total_data.append(['Total Amount:', format_currency(calculated_total)])
             
             # Table style with breakdown
             table_style = [
@@ -856,7 +865,7 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
             ])
         else:
             # Without VAT - show only Total Amount
-            total_data.append(['Total Amount:', format_currency(quotation.total_amount)])
+            total_data.append(['Total Amount:', format_currency(calculated_total)])
             
             # Simple table style for single row
             table_style = [

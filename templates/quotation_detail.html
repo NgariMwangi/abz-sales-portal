@@ -142,19 +142,19 @@
                             <tfoot>
                                 <tr>
                                     <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
-                                    <td><strong>KSh{{ quotation.subtotal|format_currency }}</strong></td>
+                                    <td><strong id="subtotalAmount">KSh0.00</strong></td>
                                     <td></td>
                                 </tr>
                                 {% if quotation.include_vat %}
-                                <tr>
+                                <tr id="vatRow">
                                     <td colspan="3" class="text-end"><strong>VAT ({{ quotation.vat_rate|default(16) }}%):</strong></td>
-                                    <td><strong>KSh{{ quotation.vat_amount|format_currency }}</strong></td>
+                                    <td><strong id="vatAmount">KSh0.00</strong></td>
                                     <td></td>
                                 </tr>
                                 {% endif %}
                                 <tr class="table-info">
                                     <td colspan="3" class="text-end"><strong>Total:</strong></td>
-                                    <td><strong>KSh{{ quotation.total_amount|format_currency }}</strong></td>
+                                    <td><strong id="totalAmount">KSh0.00</strong></td>
                                     <td></td>
                                 </tr>
                             </tfoot>
@@ -267,5 +267,53 @@ function deleteQuotation(quotationId) {
         });
     }
 }
+
+// Calculate totals from items dynamically
+function calculateTotals() {
+    // Get all item rows from the quotation items table
+    const items = [
+        {% for item in quotation.items %}
+        {
+            quantity: {{ item.quantity }},
+            unit_price: {{ item.unit_price }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+    
+    // Calculate subtotal from items
+    let subtotal = 0;
+    items.forEach(item => {
+        subtotal += parseFloat(item.quantity) * parseFloat(item.unit_price);
+    });
+    
+    // Get VAT settings
+    const includeVat = {{ 'true' if quotation.include_vat else 'false' }};
+    const vatRate = {{ quotation.vat_rate|default(16) }};
+    
+    // Calculate VAT and total
+    const vatAmount = includeVat ? subtotal * (vatRate / 100) : 0;
+    const totalAmount = subtotal + vatAmount;
+    
+    // Format currency (without decimal if it's a whole number)
+    function formatCurrency(amount) {
+        if (amount === Math.floor(amount)) {
+            return 'KSh' + amount.toLocaleString('en-KE', {maximumFractionDigits: 0});
+        } else {
+            return 'KSh' + amount.toLocaleString('en-KE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+    }
+    
+    // Update the display
+    document.getElementById('subtotalAmount').textContent = formatCurrency(subtotal);
+    if (includeVat) {
+        document.getElementById('vatAmount').textContent = formatCurrency(vatAmount);
+    }
+    document.getElementById('totalAmount').textContent = formatCurrency(totalAmount);
+}
+
+// Calculate totals when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    calculateTotals();
+});
 </script>
 {% endblock %} 

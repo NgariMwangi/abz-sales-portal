@@ -1131,6 +1131,35 @@ def api_products():
         app.logger.error(f"Error in api_products: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route("/api/quotation/<int:quotation_id>/items")
+@login_required
+def api_quotation_items(quotation_id):
+    """API endpoint to get quotation items for calculating totals"""
+    try:
+        quotation = Quotation.query.get_or_404(quotation_id)
+        
+        # Check if user has access to this quotation
+        if current_user.role != 'admin' and quotation.created_by != current_user.id:
+            return jsonify({'success': False, 'message': 'Access denied'}), 403
+        
+        # Return items data
+        items = []
+        for item in quotation.items:
+            items.append({
+                'id': item.id,
+                'quantity': float(item.quantity),
+                'unit_price': float(item.unit_price)
+            })
+        
+        return jsonify({
+            'success': True,
+            'items': items
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error in api_quotation_items: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # Utility Routes
 @app.route("/categories")
 @login_required

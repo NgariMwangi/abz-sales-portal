@@ -62,7 +62,9 @@
                     </thead>
                     <tbody>
                         {% for quotation in quotations %}
-                        <tr>
+                        <tr data-quotation-id="{{ quotation.id }}"
+                            data-include-vat="{{ 'true' if quotation.include_vat else 'false' }}"
+                            data-vat-rate="{{ quotation.vat_rate|default(16) }}">
                             <td>
                                 <strong>{{ quotation.quotation_number }}</strong>
                             </td>
@@ -73,7 +75,11 @@
                                 {% endif %}
                             </td>
                             <td>{{ quotation.branch.name }}</td>
-                            <td>KSh{{ quotation.total_amount|format_currency }}</td>
+                            <td class="quotation-total" data-quotation-id="{{ quotation.id }}">
+                                <span class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </span>
+                            </td>
                             <td>
                                 <span class="badge 
                                     {% if quotation.status == 'pending' %}bg-warning
@@ -157,4 +163,56 @@
         </div>
     </div>
 </div>
+
+<script>
+// Calculate totals for all quotations dynamically
+document.addEventListener('DOMContentLoaded', function() {
+    const quotationRows = document.querySelectorAll('tr[data-quotation-id]');
+    
+    quotationRows.forEach(row => {
+        const quotationId = row.getAttribute('data-quotation-id');
+        const includeVat = row.getAttribute('data-include-vat') === 'true';
+        const vatRate = parseFloat(row.getAttribute('data-vat-rate')) || 16;
+        const totalCell = row.querySelector('.quotation-total');
+        
+        // Fetch quotation items to calculate total
+        fetch(`/api/quotation/${quotationId}/items`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.items) {
+                    // Calculate subtotal from items
+                    let subtotal = 0;
+                    data.items.forEach(item => {
+                        subtotal += parseFloat(item.quantity) * parseFloat(item.unit_price);
+                    });
+                    
+                    // Calculate VAT and total
+                    const vat = includeVat ? subtotal * (vatRate / 100) : 0;
+                    const total = subtotal + vat;
+                    
+                    // Format currency
+                    const formattedTotal = formatCurrency(total);
+                    
+                    // Update the cell
+                    totalCell.innerHTML = formattedTotal;
+                } else {
+                    totalCell.innerHTML = 'KSh0.00';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching items for quotation', quotationId, error);
+                totalCell.innerHTML = '<span class="text-danger">Error</span>';
+            });
+    });
+});
+
+// Format currency (without decimal if it's a whole number)
+function formatCurrency(amount) {
+    if (amount === Math.floor(amount)) {
+        return 'KSh' + amount.toLocaleString('en-KE', {maximumFractionDigits: 0});
+    } else {
+        return 'KSh' + amount.toLocaleString('en-KE', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+}
+</script>
 {% endblock %} 
