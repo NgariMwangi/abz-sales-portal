@@ -812,6 +812,7 @@ class QuotationService:
                         quotation_id=quotation.id,
                         product_id=branch_product.id,
                         quantity=quantity,
+                        unit=item_data.get('unit'),
                         unit_price=unit_price,
                         total_price=quantity * unit_price,
                         notes=item_data.get('notes', '')
@@ -831,6 +832,7 @@ class QuotationService:
                         product_id=None,  # Manual items have no product ID
                         product_name=product_name,  # Store the manual item name
                         quantity=quantity,
+                        unit=item_data.get('unit'),
                         unit_price=unit_price,
                         total_price=quantity * unit_price,
                         notes=item_data.get('notes', '')

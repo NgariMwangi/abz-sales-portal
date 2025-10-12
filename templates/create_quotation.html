@@ -140,11 +140,15 @@
                             </select>
                         </div>
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <label for="quantity" class="form-label">Quantity</label>
                                 <input type="number" class="form-control" id="quantity" value="1" min="1">
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
+                                <label for="unit" class="form-label">Unit (Optional)</label>
+                                <input type="text" class="form-control" id="unit" placeholder="e.g., bags, boxes, pcs">
+                            </div>
+                            <div class="col-md-4">
                                 <label for="unit_price" class="form-label">Unit Price (KSh)</label>
                                 <input type="number" class="form-control" id="unit_price" step="0.01" min="0">
                             </div>
@@ -171,7 +175,7 @@
                                 Use this option to add items that are not in your product catalog (e.g., custom services, special orders, or one-time items).
                             </div>
                             <div class="row">
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label for="manual_item_name" class="form-label">Item Name *</label>
                                     <input type="text" class="form-control" id="manual_item_name" placeholder="Enter item name">
                                 </div>
@@ -179,7 +183,11 @@
                                     <label for="manual_quantity" class="form-label">Quantity *</label>
                                     <input type="number" class="form-control" id="manual_quantity" min="1" value="1">
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
+                                    <label for="manual_unit" class="form-label">Unit</label>
+                                    <input type="text" class="form-control" id="manual_unit" placeholder="e.g., bags">
+                                </div>
+                                <div class="col-md-2">
                                     <label for="manual_unit_price" class="form-label">Unit Price (KSh) *</label>
                                     <input type="number" class="form-control" id="manual_unit_price" min="0" step="0.01" placeholder="0.00">
                                 </div>
@@ -333,6 +341,7 @@ function updateProductInfo() {
 function addProduct() {
     const productId = document.getElementById('product_select').value;
     const quantity = parseInt(document.getElementById('quantity').value);
+    const unit = document.getElementById('unit').value.trim();
     const unitPrice = parseFloat(document.getElementById('unit_price').value);
     const notes = document.getElementById('item_notes').value;
     
@@ -363,6 +372,7 @@ function addProduct() {
             product_id: parseInt(productId),
             product_name: product.name,
             quantity: quantity,
+            unit: unit || null,
             unit_price: unitPrice,
             notes: notes
         };
@@ -385,6 +395,7 @@ function addProduct() {
                 product_id: parseInt(productId),
                 product_name: product.name,
                 quantity: quantity,
+                unit: unit || null,
                 unit_price: unitPrice,
                 notes: notes
             });
@@ -397,6 +408,7 @@ function addProduct() {
     // Reset form
     document.getElementById('product_select').value = '';
     document.getElementById('quantity').value = '1';
+    document.getElementById('unit').value = '';
     document.getElementById('unit_price').value = '';
     document.getElementById('item_notes').value = '';
 }
@@ -404,6 +416,7 @@ function addProduct() {
 function addManualItem() {
     const itemName = document.getElementById('manual_item_name').value.trim();
     const quantity = parseInt(document.getElementById('manual_quantity').value);
+    const unit = document.getElementById('manual_unit').value.trim();
     const unitPrice = parseFloat(document.getElementById('manual_unit_price').value);
     const notes = document.getElementById('manual_item_notes').value.trim();
 
@@ -431,6 +444,7 @@ function addManualItem() {
             product_id: null,
             product_name: itemName,
             quantity: quantity,
+            unit: unit || null,
             unit_price: unitPrice,
             notes: notes
         };
@@ -467,6 +481,7 @@ function addManualItem() {
         product_id: null, // No direct product ID for manual items
         product_name: itemName,
         quantity: quantity,
+        unit: unit || null,
         unit_price: unitPrice,
         notes: notes
     });
@@ -496,6 +511,7 @@ function addManualItem() {
 function clearManualItemForm() {
     document.getElementById('manual_item_name').value = '';
     document.getElementById('manual_quantity').value = '1';
+    document.getElementById('manual_unit').value = '';
     document.getElementById('manual_unit_price').value = '';
     document.getElementById('manual_item_notes').value = '';
 }
@@ -509,6 +525,7 @@ function editProduct(index) {
         // Manual item - populate manual item form
         document.getElementById('manual_item_name').value = item.product_name;
         document.getElementById('manual_quantity').value = item.quantity;
+        document.getElementById('manual_unit').value = item.unit || '';
         document.getElementById('manual_unit_price').value = item.unit_price;
         document.getElementById('manual_item_notes').value = item.notes || '';
         
@@ -525,6 +542,7 @@ function editProduct(index) {
         // Regular product - populate product form
         document.getElementById('product_select').value = item.product_id;
         document.getElementById('quantity').value = item.quantity;
+        document.getElementById('unit').value = item.unit || '';
         document.getElementById('unit_price').value = item.unit_price;
         document.getElementById('item_notes').value = item.notes || '';
         
@@ -546,6 +564,7 @@ function cancelEdit() {
     // Reset product form
     document.getElementById('product_select').value = '';
     document.getElementById('quantity').value = '1';
+    document.getElementById('unit').value = '';
     document.getElementById('unit_price').value = '';
     document.getElementById('item_notes').value = '';
     const productBtn = document.querySelector('[onclick="addProduct()"]');

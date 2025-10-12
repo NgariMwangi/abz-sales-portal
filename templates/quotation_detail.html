@@ -132,7 +132,7 @@
                                         <br><small class="text-muted">Code: {{ item.product.productcode }}</small>
                                         {% endif %}
                                     </td>
-                                    <td>{{ item.quantity|format_quantity }}</td>
+                                    <td>{{ item.quantity|format_quantity }}{% if item.unit %} {{ item.unit }}{% endif %}</td>
                                     <td>KSh{{ item.unit_price|format_currency }}</td>
                                     <td>KSh{{ item.total_price|format_currency }}</td>
                                     <td>{{ item.notes or '-' }}</td>

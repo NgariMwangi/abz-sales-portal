@@ -777,12 +777,18 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
                 product_name = 'N/A'
             
             quantity = item.quantity
+            unit = item.unit if hasattr(item, 'unit') and item.unit else ''
             unit_price = item.unit_price
             total_price = item.unit_price * item.quantity
             
+            # Format quantity with unit if available
+            quantity_text = format_quantity(quantity)
+            if unit:
+                quantity_text = f"{quantity_text} {unit}"
+            
             data.append([
                 Paragraph((product_name or 'N/A').upper(), product_name_style),
-                format_quantity(quantity),
+                quantity_text,
                 format_currency(unit_price),
                 format_currency(total_price)
             ])
