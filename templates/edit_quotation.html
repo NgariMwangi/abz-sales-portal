@@ -191,17 +191,21 @@
                                       <input type="hidden" name="item_id[]" value="">
                                   {% endif %}
                              </div>
-                             <div class="col-md-2">
+                             <div class="col-md-1">
                                  <label class="form-label">Quantity</label>
                                  <input type="number" class="form-control" name="quantity[]" value="{{ item.quantity|format_quantity }}" min="1" required>
                              </div>
                              <div class="col-md-1">
                                  <label class="form-label">Unit</label>
-                                 <input type="text" class="form-control" name="unit[]" value="{{ item.unit or '' }}" placeholder="e.g., bags">
+                                 <input type="text" class="form-control" name="unit[]" value="{{ item.unit or '' }}" placeholder="bags">
                              </div>
-                             <div class="col-md-2">
+                             <div class="col-md-1">
                                  <label class="form-label">Unit Price</label>
                                  <input type="number" class="form-control" name="unit_price[]" value="{{ item.unit_price }}" step="0.01" min="0" required>
+                             </div>
+                             <div class="col-md-1">
+                                 <label class="form-label">Price Unit</label>
+                                 <input type="text" class="form-control" name="price_unit[]" value="{{ item.price_unit or '' }}" placeholder="per floor">
                              </div>
                              <div class="col-md-1">
                                  <label class="form-label">Total</label>

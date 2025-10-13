@@ -779,6 +779,7 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
             quantity = item.quantity
             unit = item.unit if hasattr(item, 'unit') and item.unit else ''
             unit_price = item.unit_price
+            price_unit = item.price_unit if hasattr(item, 'price_unit') and item.price_unit else ''
             total_price = item.unit_price * item.quantity
             
             # Format quantity with unit if available
@@ -786,11 +787,16 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
             if unit:
                 quantity_text = f"{quantity_text} {unit}"
             
+            # Format total price with price unit if available
+            total_price_text = format_currency(total_price)
+            if price_unit:
+                total_price_text = f"{total_price_text} {price_unit}"
+            
             data.append([
                 Paragraph((product_name or 'N/A').upper(), product_name_style),
                 quantity_text,
                 format_currency(unit_price),
-                format_currency(total_price)
+                total_price_text
             ])
         
         # Create table with 4 columns

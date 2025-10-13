@@ -140,17 +140,21 @@
                             </select>
                         </div>
                         <div class="row">
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="quantity" class="form-label">Quantity</label>
                                 <input type="number" class="form-control" id="quantity" value="1" min="1">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="unit" class="form-label">Unit (Optional)</label>
-                                <input type="text" class="form-control" id="unit" placeholder="e.g., bags, boxes, pcs">
+                                <input type="text" class="form-control" id="unit" placeholder="e.g., bags, boxes">
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label for="unit_price" class="form-label">Unit Price (KSh)</label>
                                 <input type="number" class="form-control" id="unit_price" step="0.01" min="0">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="price_unit" class="form-label">Price Unit (Optional)</label>
+                                <input type="text" class="form-control" id="price_unit" placeholder="e.g., per floor">
                             </div>
                         </div>
                         <div class="mb-3">
@@ -174,7 +178,7 @@
                                 <i class="bi bi-info-circle me-1"></i>
                                 Use this option to add items that are not in your product catalog (e.g., custom services, special orders, or one-time items).
                             </div>
-                            <div class="row">
+                            <div class="row mb-2">
                                 <div class="col-md-3">
                                     <label for="manual_item_name" class="form-label">Item Name *</label>
                                     <input type="text" class="form-control" id="manual_item_name" placeholder="Enter item name">
@@ -192,6 +196,12 @@
                                     <input type="number" class="form-control" id="manual_unit_price" min="0" step="0.01" placeholder="0.00">
                                 </div>
                                 <div class="col-md-3">
+                                    <label for="manual_price_unit" class="form-label">Price Unit</label>
+                                    <input type="text" class="form-control" id="manual_price_unit" placeholder="e.g., per bag">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
                                     <label for="manual_item_notes" class="form-label">Item Notes</label>
                                     <input type="text" class="form-control" id="manual_item_notes" placeholder="Notes for this item...">
                                 </div>
@@ -343,6 +353,7 @@ function addProduct() {
     const quantity = parseInt(document.getElementById('quantity').value);
     const unit = document.getElementById('unit').value.trim();
     const unitPrice = parseFloat(document.getElementById('unit_price').value);
+    const priceUnit = document.getElementById('price_unit').value.trim();
     const notes = document.getElementById('item_notes').value;
     
     if (!productId) {
@@ -374,6 +385,7 @@ function addProduct() {
             quantity: quantity,
             unit: unit || null,
             unit_price: unitPrice,
+            price_unit: priceUnit || null,
             notes: notes
         };
         editingIndex = -1;
@@ -397,6 +409,7 @@ function addProduct() {
                 quantity: quantity,
                 unit: unit || null,
                 unit_price: unitPrice,
+                price_unit: priceUnit || null,
                 notes: notes
             });
         }
@@ -410,6 +423,7 @@ function addProduct() {
     document.getElementById('quantity').value = '1';
     document.getElementById('unit').value = '';
     document.getElementById('unit_price').value = '';
+    document.getElementById('price_unit').value = '';
     document.getElementById('item_notes').value = '';
 }
 
@@ -418,6 +432,7 @@ function addManualItem() {
     const quantity = parseInt(document.getElementById('manual_quantity').value);
     const unit = document.getElementById('manual_unit').value.trim();
     const unitPrice = parseFloat(document.getElementById('manual_unit_price').value);
+    const priceUnit = document.getElementById('manual_price_unit').value.trim();
     const notes = document.getElementById('manual_item_notes').value.trim();
 
     if (!itemName) {
@@ -446,6 +461,7 @@ function addManualItem() {
             quantity: quantity,
             unit: unit || null,
             unit_price: unitPrice,
+            price_unit: priceUnit || null,
             notes: notes
         };
         editingIndex = -1;
@@ -483,6 +499,7 @@ function addManualItem() {
         quantity: quantity,
         unit: unit || null,
         unit_price: unitPrice,
+        price_unit: priceUnit || null,
         notes: notes
     });
 
@@ -513,6 +530,7 @@ function clearManualItemForm() {
     document.getElementById('manual_quantity').value = '1';
     document.getElementById('manual_unit').value = '';
     document.getElementById('manual_unit_price').value = '';
+    document.getElementById('manual_price_unit').value = '';
     document.getElementById('manual_item_notes').value = '';
 }
 
@@ -527,6 +545,7 @@ function editProduct(index) {
         document.getElementById('manual_quantity').value = item.quantity;
         document.getElementById('manual_unit').value = item.unit || '';
         document.getElementById('manual_unit_price').value = item.unit_price;
+        document.getElementById('manual_price_unit').value = item.price_unit || '';
         document.getElementById('manual_item_notes').value = item.notes || '';
         
         // Change button text and show cancel button
@@ -544,6 +563,7 @@ function editProduct(index) {
         document.getElementById('quantity').value = item.quantity;
         document.getElementById('unit').value = item.unit || '';
         document.getElementById('unit_price').value = item.unit_price;
+        document.getElementById('price_unit').value = item.price_unit || '';
         document.getElementById('item_notes').value = item.notes || '';
         
         // Change button text and show cancel button
@@ -566,6 +586,7 @@ function cancelEdit() {
     document.getElementById('quantity').value = '1';
     document.getElementById('unit').value = '';
     document.getElementById('unit_price').value = '';
+    document.getElementById('price_unit').value = '';
     document.getElementById('item_notes').value = '';
     const productBtn = document.querySelector('[onclick="addProduct()"]');
     productBtn.innerHTML = '<i class="fas fa-plus"></i> Add Product';
@@ -642,6 +663,12 @@ function updateQuotationItemsDisplay() {
         const isManualItem = item.product_id === null;
         const isEditing = editingIndex === index;
         
+        // Format quantity with unit
+        const quantityDisplay = item.unit ? `${item.quantity} ${item.unit}` : item.quantity;
+        
+        // Format total price with price unit
+        const totalDisplay = item.price_unit ? `KSh${total.toFixed(2)} ${item.price_unit}` : `KSh${total.toFixed(2)}`;
+        
         html += `
             <tr class="${isManualItem ? 'table-warning' : ''} ${isEditing ? 'table-info' : ''}">
                 <td>
@@ -649,9 +676,9 @@ function updateQuotationItemsDisplay() {
                     ${isManualItem ? '<span class="badge bg-warning text-dark ms-2">Manual</span>' : ''}
                     ${isEditing ? '<span class="badge bg-info ms-2">Editing</span>' : ''}
                 </td>
-                <td>${item.quantity}</td>
+                <td>${quantityDisplay}</td>
                 <td>KSh${item.unit_price.toFixed(2)}</td>
-                <td>KSh${total.toFixed(2)}</td>
+                <td>${totalDisplay}</td>
                 <td>${item.notes || '-'}</td>
                 <td>
                     <button type="button" class="btn btn-primary btn-sm me-1" onclick="editProduct(${index})" title="Edit this item">

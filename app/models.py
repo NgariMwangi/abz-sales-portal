@@ -472,6 +472,7 @@ class QuotationItem(db.Model):
     quantity = db.Column(db.Numeric(10, 3), nullable=False)  # Support up to 3 decimal places
     unit = db.Column(db.String(50), nullable=True)  # Unit of measurement (e.g., "bags", "boxes", "pcs")
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    price_unit = db.Column(db.String(50), nullable=True)  # Price unit (e.g., "per bag", "per floor", "per box")
     total_price = db.Column(db.Numeric(10, 2), nullable=False)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

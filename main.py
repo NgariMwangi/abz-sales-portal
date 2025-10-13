@@ -1453,6 +1453,7 @@ def edit_quotation(quotation_id):
             quantities = request.form.getlist('quantity[]')
             units = request.form.getlist('unit[]')
             unit_prices = request.form.getlist('unit_price[]')
+            price_units = request.form.getlist('price_unit[]')
             notes = request.form.getlist('notes[]')
             
             # Debug logging
@@ -1497,10 +1498,11 @@ def edit_quotation(quotation_id):
                     item_id = item_ids[i] if i < len(item_ids) else ''
                     item_name = item_names[i] if i < len(item_names) else ''
                     unit = units[i] if i < len(units) else ''
+                    price_unit = price_units[i] if i < len(price_units) else ''
                     note = notes[i] if i < len(notes) else ''
                     
                     # Debug logging for each item
-                    print(f"DEBUG Item {i}: item_id='{item_id}', item_name='{item_name}', quantity='{quantity}', unit='{unit}', unit_price='{unit_price}'")
+                    print(f"DEBUG Item {i}: item_id='{item_id}', item_name='{item_name}', quantity='{quantity}', unit='{unit}', unit_price='{unit_price}', price_unit='{price_unit}'")
                     
                     # Check if it's a regular product or manual item
                     if item_id and item_id.strip() and item_id != '':  # Regular product
@@ -1512,6 +1514,7 @@ def edit_quotation(quotation_id):
                             quantity=quantity,
                             unit=unit if unit else None,
                             unit_price=unit_price,
+                            price_unit=price_unit if price_unit else None,
                             total_price=total_price,
                             notes=note if note else None
                         )
@@ -1543,6 +1546,7 @@ def edit_quotation(quotation_id):
                             quantity=quantity,
                             unit=unit if unit else None,
                             unit_price=unit_price,
+                            price_unit=price_unit if price_unit else None,
                             total_price=total_price,
                             notes=note if note else None
                         )

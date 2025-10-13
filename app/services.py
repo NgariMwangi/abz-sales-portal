@@ -814,6 +814,7 @@ class QuotationService:
                         quantity=quantity,
                         unit=item_data.get('unit'),
                         unit_price=unit_price,
+                        price_unit=item_data.get('price_unit'),
                         total_price=quantity * unit_price,
                         notes=item_data.get('notes', '')
                     )
@@ -834,6 +835,7 @@ class QuotationService:
                         quantity=quantity,
                         unit=item_data.get('unit'),
                         unit_price=unit_price,
+                        price_unit=item_data.get('price_unit'),
                         total_price=quantity * unit_price,
                         notes=item_data.get('notes', '')
                     )

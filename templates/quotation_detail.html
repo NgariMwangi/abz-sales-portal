@@ -134,7 +134,7 @@
                                     </td>
                                     <td>{{ item.quantity|format_quantity }}{% if item.unit %} {{ item.unit }}{% endif %}</td>
                                     <td>KSh{{ item.unit_price|format_currency }}</td>
-                                    <td>KSh{{ item.total_price|format_currency }}</td>
+                                    <td>KSh{{ item.total_price|format_currency }}{% if item.price_unit %} {{ item.price_unit }}{% endif %}</td>
                                     <td>{{ item.notes or '-' }}</td>
                                 </tr>
                                 {% endfor %}
