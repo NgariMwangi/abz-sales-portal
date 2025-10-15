@@ -1443,6 +1443,8 @@ def edit_quotation(quotation_id):
             quotation.customer_phone = request.form.get('customer_phone')
             quotation.notes = request.form.get('notes')
             quotation.valid_until = datetime.strptime(request.form.get('valid_until'), '%Y-%m-%d') if request.form.get('valid_until') else None
+            from decimal import Decimal
+            quotation.discount_percentage = Decimal(str(request.form.get('discount_percentage', 0))) if request.form.get('discount_percentage') else Decimal('0.00')
             quotation.include_vat = request.form.get('include_vat') in ['true', 'True', True, 'on']
             quotation.vat_rate = float(request.form.get('vat_rate', 16.00))
             quotation.updated_at = datetime.utcnow()

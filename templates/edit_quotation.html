@@ -73,6 +73,13 @@
                             <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Additional notes...">{{ quotation.notes or '' }}</textarea>
                         </div>
                         <div class="mb-3">
+                            <label for="discount_percentage" class="form-label">Discount (%)</label>
+                            <input type="number" class="form-control" id="discount_percentage" name="discount_percentage" 
+                                   min="0" max="100" step="0.01" value="{{ quotation.discount_percentage|default(0) }}" 
+                                   onchange="updateGrandTotal()" oninput="updateGrandTotal()">
+                            <small class="text-muted">Enter discount percentage (0-100%)</small>
+                        </div>
+                        <div class="mb-3">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="include_vat" name="include_vat" {% if quotation.include_vat %}checked{% endif %} onchange="updateGrandTotal()">
                                 <label class="form-check-label" for="include_vat">
@@ -248,6 +255,14 @@
                                  <td class="text-end"><strong>Subtotal:</strong></td>
                                  <td class="text-end" id="subtotalDisplay">KSh{{ quotation.subtotal|format_currency }}</td>
                              </tr>
+                             <tr id="discountRow" style="display: none;">
+                                 <td class="text-end"><strong>Discount (<span id="discountPercentageDisplay">0</span>%):</strong></td>
+                                 <td class="text-end text-danger" id="discountDisplay">-KSh0.00</td>
+                             </tr>
+                             <tr id="subtotalAfterDiscountRow" style="display: none;">
+                                 <td class="text-end"><strong>Subtotal after Discount:</strong></td>
+                                 <td class="text-end" id="subtotalAfterDiscountDisplay">KSh0.00</td>
+                             </tr>
                              <tr id="vatRow" {% if not quotation.include_vat %}style="display: none;"{% endif %}>
                                  <td class="text-end"><strong>VAT ({{ quotation.vat_rate|default(16) }}%):</strong></td>
                                  <td class="text-end" id="vatDisplay">KSh{{ quotation.vat_amount|format_currency }}</td>
@@ -364,16 +379,36 @@ function updateGrandTotal() {
         }
     });
     
-    // Calculate VAT if enabled
+    // Get discount percentage
+    const discountPercentage = parseFloat(document.getElementById('discount_percentage').value) || 0;
+    const discountAmount = subtotal * (discountPercentage / 100);
+    const subtotalAfterDiscount = subtotal - discountAmount;
+    
+    // Calculate VAT on discounted amount
     const includeVat = document.getElementById('include_vat').checked;
     const vatRate = 16; // 16%
-    const vatAmount = includeVat ? subtotal * (vatRate / 100) : 0;
-    const grandTotal = subtotal + vatAmount;
+    const vatAmount = includeVat ? subtotalAfterDiscount * (vatRate / 100) : 0;
+    const grandTotal = subtotalAfterDiscount + vatAmount;
     
     // Update all displays
     const subtotalElement = document.getElementById('subtotalDisplay');
     if (subtotalElement) {
         subtotalElement.textContent = `KSh${subtotal.toFixed(2)}`;
+    }
+    
+    const discountPercentageDisplayElement = document.getElementById('discountPercentageDisplay');
+    if (discountPercentageDisplayElement) {
+        discountPercentageDisplayElement.textContent = discountPercentage.toFixed(2);
+    }
+    
+    const discountElement = document.getElementById('discountDisplay');
+    if (discountElement) {
+        discountElement.textContent = `-KSh${discountAmount.toFixed(2)}`;
+    }
+    
+    const subtotalAfterDiscountElement = document.getElementById('subtotalAfterDiscountDisplay');
+    if (subtotalAfterDiscountElement) {
+        subtotalAfterDiscountElement.textContent = `KSh${subtotalAfterDiscount.toFixed(2)}`;
     }
     
     const vatElement = document.getElementById('vatDisplay');
@@ -384,6 +419,17 @@ function updateGrandTotal() {
     const grandTotalElement = document.getElementById('grandTotal');
     if (grandTotalElement) {
         grandTotalElement.textContent = `KSh${grandTotal.toFixed(2)}`;
+    }
+    
+    // Show/hide discount rows
+    const discountRow = document.getElementById('discountRow');
+    const subtotalAfterDiscountRow = document.getElementById('subtotalAfterDiscountRow');
+    const hasDiscount = discountPercentage > 0;
+    if (discountRow) {
+        discountRow.style.display = hasDiscount ? '' : 'none';
+    }
+    if (subtotalAfterDiscountRow) {
+        subtotalAfterDiscountRow.style.display = hasDiscount ? '' : 'none';
     }
     
     // Show/hide VAT row

@@ -434,6 +434,7 @@ class Quotation(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     branch_id = db.Column(db.Integer, db.ForeignKey('branch.id'), nullable=False)
     subtotal = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
+    discount_percentage = db.Column(db.Numeric(5, 2), nullable=True, default=0.00)  # Discount percentage (e.g., 10.00 for 10%)
     total_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     include_vat = db.Column(db.Boolean, default=False, nullable=False)
     vat_rate = db.Column(db.Numeric(5, 2), default=16.00, nullable=False)  # VAT percentage (e.g., 16.00 for 16%)
@@ -449,18 +450,32 @@ class Quotation(db.Model):
     branch = db.relationship('Branch', backref='quotations')
     
     @property
-    def vat_amount(self):
-        """Calculate VAT amount based on subtotal and vat_rate"""
+    def discount_amount(self):
+        """Calculate discount amount based on subtotal and discount_percentage"""
         from decimal import Decimal
-        if self.include_vat and self.subtotal:
-            return Decimal(str(self.subtotal)) * (Decimal(str(self.vat_rate)) / Decimal('100'))
+        if self.discount_percentage and self.subtotal:
+            return Decimal(str(self.subtotal)) * (Decimal(str(self.discount_percentage)) / Decimal('100'))
+        return Decimal('0.00')
+    
+    @property
+    def subtotal_after_discount(self):
+        """Calculate subtotal after discount"""
+        from decimal import Decimal
+        return Decimal(str(self.subtotal)) - self.discount_amount
+    
+    @property
+    def vat_amount(self):
+        """Calculate VAT amount based on subtotal after discount and vat_rate"""
+        from decimal import Decimal
+        if self.include_vat:
+            return self.subtotal_after_discount * (Decimal(str(self.vat_rate)) / Decimal('100'))
         return Decimal('0.00')
     
     def calculate_totals(self):
         """Recalculate subtotal and total_amount based on items"""
         from decimal import Decimal
         self.subtotal = sum(item.total_price for item in self.items) if self.items else Decimal('0.00')
-        self.total_amount = Decimal(str(self.subtotal)) + self.vat_amount
+        self.total_amount = self.subtotal_after_discount + self.vat_amount
 
 
 class QuotationItem(db.Model):

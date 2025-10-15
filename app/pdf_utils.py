@@ -837,57 +837,58 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
     # Calculate totals dynamically from items
     calculated_subtotal = sum(float(item.quantity) * float(item.unit_price) for item in quotation.items) if quotation.items else 0.00
     
-    # Calculate VAT
+    # Calculate discount
+    discount_percentage = float(quotation.discount_percentage) if quotation.discount_percentage else 0.00
+    discount_amount = calculated_subtotal * (discount_percentage / 100)
+    subtotal_after_discount = calculated_subtotal - discount_amount
+    
+    # Calculate VAT on discounted amount
     vat_rate = float(quotation.vat_rate) if quotation.vat_rate else 16.00
-    calculated_vat = calculated_subtotal * (vat_rate / 100) if quotation.include_vat else 0.00
+    calculated_vat = subtotal_after_discount * (vat_rate / 100) if quotation.include_vat else 0.00
     
     # Calculate total
-    calculated_total = calculated_subtotal + calculated_vat
+    calculated_total = subtotal_after_discount + calculated_vat
     
-    # Total Amount - show breakdown only if VAT is included
-    if calculated_total:
+    # Total Amount breakdown
+    if calculated_total or calculated_subtotal:
         total_data = []
         
+        # Always show subtotal
+        total_data.append(['Subtotal:', format_currency(calculated_subtotal)])
+        
+        # Show discount if applicable
+        has_discount = discount_percentage > 0
+        if has_discount:
+            discount_label = f'Discount ({discount_percentage:.2f}%):'
+            total_data.append([discount_label, f'-{format_currency(discount_amount)}'])
+            total_data.append(['Subtotal after Discount:', format_currency(subtotal_after_discount)])
+        
+        # Show VAT if applicable
         if quotation.include_vat:
-            # With VAT - show breakdown: Subtotal, VAT, and Total
-            total_data.append(['Subtotal:', format_currency(calculated_subtotal)])
-            
             vat_label = f'VAT ({vat_rate:.0f}%):'
             total_data.append([vat_label, format_currency(calculated_vat)])
-            
-            total_data.append(['Total Amount:', format_currency(calculated_total)])
-            
-            # Table style with breakdown
-            table_style = [
-                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-                ('FONTNAME', (0, 0), (-1, -2), 'Helvetica'),
-                ('FONTSIZE', (0, 0), (-1, -1), 12),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                ('LINEABOVE', (0, 0), (-1, 0), 1, colors.HexColor('#cbd5e0')),
-            ]
-            
-            # Style for the last row (Total Amount) - make it bold with background
-            last_row_idx = len(total_data) - 1
-            table_style.extend([
-                ('FONTNAME', (0, last_row_idx), (-1, last_row_idx), 'Helvetica-Bold'),
-                ('LINEABOVE', (0, last_row_idx), (-1, last_row_idx), 2, colors.HexColor('#4a5568')),
-                ('BACKGROUND', (0, last_row_idx), (-1, last_row_idx), colors.HexColor('#e2e8f0')),
-            ])
-        else:
-            # Without VAT - show only Total Amount
-            total_data.append(['Total Amount:', format_currency(calculated_total)])
-            
-            # Simple table style for single row
-            table_style = [
-                ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
-                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 12),
-                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#4a5568')),
-                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#e2e8f0')),
-            ]
+        
+        # Total row
+        total_data.append(['Total Amount:', format_currency(calculated_total)])
+        
+        # Table style
+        table_style = [
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, -2), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 12),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.HexColor('#cbd5e0')),
+        ]
+        
+        # Style for the last row (Total Amount) - make it bold with background
+        last_row_idx = len(total_data) - 1
+        table_style.extend([
+            ('FONTNAME', (0, last_row_idx), (-1, last_row_idx), 'Helvetica-Bold'),
+            ('LINEABOVE', (0, last_row_idx), (-1, last_row_idx), 2, colors.HexColor('#4a5568')),
+            ('BACKGROUND', (0, last_row_idx), (-1, last_row_idx), colors.HexColor('#e2e8f0')),
+        ])
         
         total_table = Table(total_data, colWidths=[2*inch, 2*inch])
         total_table.setStyle(TableStyle(table_style))

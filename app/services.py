@@ -779,6 +779,7 @@ class QuotationService:
                 branch_id=int(data['branch_id']),
                 valid_until=datetime.strptime(data['valid_until'], '%Y-%m-%d') if data.get('valid_until') else None,
                 notes=data.get('notes', ''),
+                discount_percentage=Decimal(str(data.get('discount_percentage', 0))) if data.get('discount_percentage') else Decimal('0.00'),
                 include_vat=data.get('include_vat') in ['true', 'True', True, 'on'],
                 vat_rate=Decimal(str(data.get('vat_rate', 16.00))),
                 subtotal=Decimal('0.00'),
