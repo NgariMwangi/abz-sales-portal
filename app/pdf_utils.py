@@ -755,7 +755,7 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
         # Table data - Product Name, Quantity, Unit Price, Total Price
         data = [['Product Name', 'Quantity', 'Unit Price', 'Total Price']]
         
-        # Create a style for product names that allows wrapping
+        # Create styles for table cells that allow wrapping
         product_name_style = ParagraphStyle(
             'ProductName',
             parent=styles['Normal'],
@@ -764,6 +764,28 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
             spaceBefore=0,
             leading=13,  # Line spacing for multi-line text
             alignment=0,  # Left alignment
+            fontName='Helvetica'
+        )
+        
+        center_style = ParagraphStyle(
+            'CenterText',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=0,
+            spaceBefore=0,
+            leading=13,
+            alignment=1,  # Center alignment
+            fontName='Helvetica'
+        )
+        
+        right_style = ParagraphStyle(
+            'RightText',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=0,
+            spaceBefore=0,
+            leading=13,
+            alignment=2,  # Right alignment
             fontName='Helvetica'
         )
         
@@ -794,9 +816,9 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
             
             data.append([
                 Paragraph((product_name or 'N/A').upper(), product_name_style),
-                quantity_text,
-                format_currency(unit_price),
-                total_price_text
+                Paragraph(quantity_text, center_style),
+                Paragraph(format_currency(unit_price), right_style),
+                Paragraph(total_price_text, right_style)
             ])
         
         # Create table with 4 columns
@@ -808,11 +830,13 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, 0), 12),
+            ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
             
             # Data rows
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
             ('FONTSIZE', (0, 1), (-1, -1), 11),
             ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#4a5568')),
+            ('VALIGN', (0, 1), (-1, -1), 'TOP'),  # Vertical alignment for wrapped text
             
             # Alternating row colors
             ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
@@ -826,6 +850,8 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
             # Padding
             ('TOPPADDING', (0, 0), (-1, -1), 8),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
         ]))
         
         elements.append(table)

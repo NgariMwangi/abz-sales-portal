@@ -54,6 +54,21 @@
     #cancelEditBtn {
         display: none;
     }
+    
+    /* Table column wrapping */
+    .table td, .table th {
+        white-space: normal;
+        word-wrap: break-word;
+        word-break: break-word;
+        overflow-wrap: break-word;
+    }
+    
+    .table input[type="text"],
+    .table input[type="number"],
+    .table select {
+        min-width: 100%;
+        max-width: 100%;
+    }
 </style>
 {% endblock %}
 

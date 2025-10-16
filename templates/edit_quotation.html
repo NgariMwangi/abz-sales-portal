@@ -24,6 +24,21 @@
         font-size: 0.75em;
         padding: 0.25em 0.5em;
     }
+    
+    /* Table column wrapping */
+    .table td, .table th {
+        white-space: normal;
+        word-wrap: break-word;
+        word-break: break-word;
+        overflow-wrap: break-word;
+    }
+    
+    .quotation-item input[type="text"],
+    .quotation-item input[type="number"],
+    .quotation-item select {
+        min-width: 100%;
+        max-width: 100%;
+    }
 </style>
 {% endblock %}
 
