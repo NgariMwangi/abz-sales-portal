@@ -438,6 +438,7 @@ class Quotation(db.Model):
     total_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0.00)
     include_vat = db.Column(db.Boolean, default=False, nullable=False)
     vat_rate = db.Column(db.Numeric(5, 2), default=16.00, nullable=False)  # VAT percentage (e.g., 16.00 for 16%)
+    show_quantity_in_pdf = db.Column(db.Boolean, default=True, nullable=False)  # Show/hide quantity column in PDF
     status = db.Column(db.String, default='pending')  # pending, accepted, rejected, expired
     valid_until = db.Column(db.DateTime, nullable=True)
     notes = db.Column(db.Text, nullable=True)

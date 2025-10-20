@@ -782,6 +782,7 @@ class QuotationService:
                 discount_percentage=Decimal(str(data.get('discount_percentage', 0))) if data.get('discount_percentage') else Decimal('0.00'),
                 include_vat=data.get('include_vat') in ['true', 'True', True, 'on'],
                 vat_rate=Decimal(str(data.get('vat_rate', 16.00))),
+                show_quantity_in_pdf=data.get('show_quantity_in_pdf') in ['true', 'True', True, 'on'],
                 subtotal=Decimal('0.00'),
                 total_amount=Decimal('0.00')
             )

@@ -1447,6 +1447,7 @@ def edit_quotation(quotation_id):
             quotation.discount_percentage = Decimal(str(request.form.get('discount_percentage', 0))) if request.form.get('discount_percentage') else Decimal('0.00')
             quotation.include_vat = request.form.get('include_vat') in ['true', 'True', True, 'on']
             quotation.vat_rate = float(request.form.get('vat_rate', 16.00))
+            quotation.show_quantity_in_pdf = request.form.get('show_quantity_in_pdf') in ['true', 'True', True, 'on']
             quotation.updated_at = datetime.utcnow()
             
             # Update items

@@ -752,8 +752,14 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
     if quotation.items:
         elements.append(Paragraph("ITEMS QUOTED", heading_style))
         
-        # Table data - Product Name, Quantity, Unit Price, Total Price
-        data = [['Product Name', 'Quantity', 'Unit Price', 'Total Price']]
+        # Check if quantity should be shown
+        show_quantity = quotation.show_quantity_in_pdf if hasattr(quotation, 'show_quantity_in_pdf') else True
+        
+        # Table data - Product Name, Quantity (optional), Unit Price, Total Price
+        if show_quantity:
+            data = [['Product Name', 'Quantity', 'Unit Price', 'Total Price']]
+        else:
+            data = [['Product Name', 'Unit Price', 'Total Price']]
         
         # Create styles for table cells that allow wrapping
         product_name_style = ParagraphStyle(
@@ -814,45 +820,86 @@ def create_quotation_pdf_a4(quotation, user_data, output_path):
             if price_unit:
                 total_price_text = f"{total_price_text} {price_unit}"
             
-            data.append([
-                Paragraph((product_name or 'N/A').upper(), product_name_style),
-                Paragraph(quantity_text, center_style),
-                Paragraph(format_currency(unit_price), right_style),
-                Paragraph(total_price_text, right_style)
-            ])
+            # Build row data based on show_quantity setting
+            if show_quantity:
+                data.append([
+                    Paragraph((product_name or 'N/A').upper(), product_name_style),
+                    Paragraph(quantity_text, center_style),
+                    Paragraph(format_currency(unit_price), right_style),
+                    Paragraph(total_price_text, right_style)
+                ])
+            else:
+                data.append([
+                    Paragraph((product_name or 'N/A').upper(), product_name_style),
+                    Paragraph(format_currency(unit_price), right_style),
+                    Paragraph(total_price_text, right_style)
+                ])
         
-        # Create table with 4 columns
-        table = Table(data, colWidths=[3.5*inch, 1*inch, 1.5*inch, 1.5*inch])
-        table.setStyle(TableStyle([
-            # Header row
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a365d')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
-            
-            # Data rows
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 11),
-            ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#4a5568')),
-            ('VALIGN', (0, 1), (-1, -1), 'TOP'),  # Vertical alignment for wrapped text
-            
-            # Alternating row colors
-            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f7fafc'), colors.white]),
-            
-            # Alignment adjustments
-            ('ALIGN', (0, 1), (0, -1), 'LEFT'),    # Product Name left
-            ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # Quantity center
-            ('ALIGN', (2, 1), (3, -1), 'RIGHT'),   # Prices right
-            
-            # Padding
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ]))
+        # Create table with appropriate columns
+        if show_quantity:
+            table = Table(data, colWidths=[3.5*inch, 1*inch, 1.5*inch, 1.5*inch])
+            table.setStyle(TableStyle([
+                # Header row
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a365d')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
+                
+                # Data rows
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 11),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#4a5568')),
+                ('VALIGN', (0, 1), (-1, -1), 'TOP'),  # Vertical alignment for wrapped text
+                
+                # Alternating row colors
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f7fafc'), colors.white]),
+                
+                # Alignment adjustments
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),    # Product Name left
+                ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # Quantity center
+                ('ALIGN', (2, 1), (3, -1), 'RIGHT'),   # Prices right
+                
+                # Padding
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ]))
+        else:
+            # Without quantity column - 3 columns only
+            table = Table(data, colWidths=[4*inch, 1.75*inch, 1.75*inch])
+            table.setStyle(TableStyle([
+                # Header row
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a365d')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
+                
+                # Data rows
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 11),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#4a5568')),
+                ('VALIGN', (0, 1), (-1, -1), 'TOP'),  # Vertical alignment for wrapped text
+                
+                # Alternating row colors
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f7fafc'), colors.white]),
+                
+                # Alignment adjustments
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),    # Product Name left
+                ('ALIGN', (1, 1), (2, -1), 'RIGHT'),   # Prices right
+                
+                # Padding
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ]))
         
         elements.append(table)
         elements.append(Spacer(1, 30))
